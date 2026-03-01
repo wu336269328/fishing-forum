@@ -1,0 +1,11 @@
+fishing-forum/backend/target/
+*.class
+fishing-forum/frontend/node_modules/
+fishing-forum/frontend/dist/
+fishing-forum/backend/uploads/
+.idea/
+*.iml
+.vscode/
+*.log
+nohup.out
+.gemini/

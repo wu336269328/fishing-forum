@@ -1,0 +1,120 @@
+<template>
+  <div>
+    <!-- 公告 -->
+    <div v-if="announcements.length" class="card" style="background:#fffbe6; border-color:#ffe58f">
+      <div v-for="a in announcements" :key="a.id" style="font-size:13px; padding:2px 0">📢 <b>{{ a.title }}</b> — {{ a.content }}</div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="stat-row">
+      <div class="stat-item"><div class="stat-num">{{ stats.postCount || 0 }}</div><div class="stat-label">帖子</div></div>
+      <div class="stat-item"><div class="stat-num">{{ stats.userCount || 0 }}</div><div class="stat-label">用户</div></div>
+      <div class="stat-item"><div class="stat-num">{{ stats.spotCount || 0 }}</div><div class="stat-label">钓点</div></div>
+      <div class="stat-item"><div class="stat-num">{{ stats.wikiCount || 0 }}</div><div class="stat-label">词条</div></div>
+    </div>
+
+    <div class="home-grid">
+      <!-- 帖子列表 -->
+      <div class="main-col">
+        <h2 class="page-title">最新帖子</h2>
+        <div v-for="post in posts" :key="post.id" class="card post-item" @click="$router.push(`/post/${post.id}`)">
+          <div class="card-header">
+            <img :src="post.authorAvatar || '/default-avatar.png'" class="avatar-sm" />
+            <div>
+              <span class="text-link" @click.stop="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
+              <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
+            </div>
+            <div style="margin-left:auto; display:flex; gap:4px">
+              <el-tag v-if="post.isTop" size="small" type="danger">置顶</el-tag>
+              <el-tag v-if="post.isFeatured" size="small" type="warning">精华</el-tag>
+            </div>
+          </div>
+          <div class="post-title">{{ post.title }}</div>
+          <div class="post-excerpt">{{ stripHtml(post.content) }}</div>
+          <div class="post-meta">
+            <span>{{ post.sectionName }}</span>
+            <span>👁 {{ post.viewCount }}</span>
+            <span>💬 {{ post.commentCount }}</span>
+            <span>👍 {{ post.likeCount }}</span>
+          </div>
+        </div>
+        <el-empty v-if="!posts.length" description="暂无帖子，快来发第一帖吧！" />
+      </div>
+
+      <!-- 侧边栏 -->
+      <div class="side-col">
+        <!-- 板块 -->
+        <div class="card">
+          <h3 style="font-size:14px; margin-bottom:10px">📋 板块导航</h3>
+          <div v-for="s in sections" :key="s.id" class="side-item">
+            <router-link :to="`/forum?sectionId=${s.id}`">{{ s.icon }} {{ s.name }}</router-link>
+            <span class="text-muted">{{ s.postCount || 0 }}</span>
+          </div>
+        </div>
+        <!-- 快捷入口 -->
+        <div class="card">
+          <h3 style="font-size:14px; margin-bottom:10px">🔗 快捷入口</h3>
+          <router-link to="/post/create" class="quick-link">📝 发表帖子</router-link>
+          <router-link to="/spots" class="quick-link">📍 钓点推荐</router-link>
+          <router-link to="/wiki" class="quick-link">📖 钓鱼百科</router-link>
+          <router-link to="/weather" class="quick-link">🌤 天气查询</router-link>
+        </div>
+        <!-- 活跃用户 -->
+        <div class="card" v-if="activeUsers.length">
+          <h3 style="font-size:14px; margin-bottom:10px">🏆 活跃钓友</h3>
+          <div v-for="u in activeUsers" :key="u.id" class="side-item" style="cursor:pointer" @click="$router.push(`/profile/${u.id}`)">
+            <img :src="u.avatar || '/default-avatar.png'" class="avatar-sm" />
+            <span style="font-size:13px">{{ u.username }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import request from '../api/request'
+
+const posts = ref([]), sections = ref([]), announcements = ref([]), stats = ref({}), activeUsers = ref([])
+
+const formatTime = (t) => {
+  if (!t) return ''
+  const d = new Date(t), now = new Date(), diff = (now - d) / 1000
+  if (diff < 60) return '刚刚'
+  if (diff < 3600) return Math.floor(diff / 60) + '分钟前'
+  if (diff < 86400) return Math.floor(diff / 3600) + '小时前'
+  return d.toLocaleDateString('zh-CN')
+}
+const stripHtml = (h) => h ? h.replace(/<[^>]+>/g, '').substring(0, 120) : ''
+
+onMounted(async () => {
+  const [p, s, a] = await Promise.all([
+    request.get('/api/posts', { params: { page: 1, size: 10 } }),
+    request.get('/api/sections'),
+    request.get('/api/announcements')
+  ])
+  if (p.code === 200) posts.value = p.data.records || []
+  if (s.code === 200) sections.value = s.data || []
+  if (a.code === 200) announcements.value = (a.data || []).filter(x => x.isActive)
+  // 尝试获取统计
+  try { const r = await request.get('/api/admin/statistics'); if (r.code === 200) stats.value = r.data } catch (e) {
+    stats.value = { postCount: posts.value.length, userCount: '?', spotCount: '?', wikiCount: '?' }
+  }
+})
+</script>
+
+<style scoped>
+.home-grid { display: grid; grid-template-columns: 1fr 240px; gap: 16px; }
+.post-item { cursor: pointer; transition: box-shadow 0.15s; }
+.post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.post-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #222; }
+.post-excerpt { font-size: 13px; color: #777; margin-bottom: 8px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.post-meta { font-size: 12px; color: #999; display: flex; gap: 12px; }
+.side-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+.side-item a { color: #555; flex: 1; }
+.side-item a:hover { color: #1a73e8; }
+.quick-link { display: block; padding: 5px 0; font-size: 13px; color: #555; }
+.quick-link:hover { color: #1a73e8; }
+@media (max-width: 768px) { .home-grid { grid-template-columns: 1fr; } .side-col { display: none; } }
+</style>
