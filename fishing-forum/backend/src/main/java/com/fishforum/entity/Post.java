@@ -16,6 +16,8 @@ public class Post {
     private String content;
     private Long userId;
     private Long sectionId;
+    private Long tagId;
+    private String postType; // NORMAL / CATCH / REVIEW
     private Boolean isTop;
     private Boolean isFeatured;
     private Integer viewCount;
@@ -34,7 +36,9 @@ public class Post {
     @TableField(exist = false)
     private String sectionName;
     @TableField(exist = false)
-    private Boolean liked; // 当前用户是否点赞
+    private Boolean liked;
     @TableField(exist = false)
-    private Boolean favorited; // 当前用户是否收藏
+    private Boolean favorited;
+    @TableField(exist = false)
+    private String tagName;
 }

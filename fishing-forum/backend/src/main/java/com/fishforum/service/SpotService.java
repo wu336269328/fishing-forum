@@ -53,7 +53,7 @@ public class SpotService {
     public Result<?> getSpot(Long id) {
         FishingSpot spot = spotMapper.selectById(id);
         if (spot == null)
-            return Result.error("钓点不存在");
+            return Result.error(404, "钓点不存在");
         enrichSpot(spot);
         return Result.ok(spot);
     }
@@ -71,9 +71,9 @@ public class SpotService {
     public Result<?> updateSpot(Long id, FishingSpot update, Long userId) {
         FishingSpot spot = spotMapper.selectById(id);
         if (spot == null)
-            return Result.error("钓点不存在");
+            return Result.error(404, "钓点不存在");
         if (!spot.getUserId().equals(userId))
-            return Result.error("无权修改");
+            return Result.error(403, "无权修改");
         if (update.getName() != null)
             spot.setName(update.getName());
         if (update.getDescription() != null)
@@ -92,9 +92,9 @@ public class SpotService {
     public Result<?> deleteSpot(Long id, Long userId, String role) {
         FishingSpot spot = spotMapper.selectById(id);
         if (spot == null)
-            return Result.error("钓点不存在");
+            return Result.error(404, "钓点不存在");
         if (!spot.getUserId().equals(userId) && !"ADMIN".equals(role))
-            return Result.error("无权删除");
+            return Result.error(403, "无权删除");
         spotMapper.deleteById(id);
         return Result.ok("删除成功");
     }

@@ -1,6 +1,8 @@
 # 钓鱼论坛 - 应用配置
 server:
   port: 8080
+  tomcat:
+    uri-encoding: UTF-8
 
 spring:
   # 数据库配置

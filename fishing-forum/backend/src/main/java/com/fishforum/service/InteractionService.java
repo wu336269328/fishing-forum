@@ -46,9 +46,9 @@ public class InteractionService {
     // 发表评论
     public Result<?> addComment(Long postId, String content, Long parentId, Long userId) {
         if (content == null || content.trim().isEmpty())
-            return Result.error("评论内容不能为空");
+            return Result.error(400, "评论内容不能为空");
         if (content.length() > 2000)
-            return Result.error("评论内容不能超过2000字");
+            return Result.error(400, "评论内容不能超过2000字");
         Comment comment = new Comment();
         comment.setPostId(postId);
         comment.setContent(content);
@@ -69,9 +69,9 @@ public class InteractionService {
     public Result<?> deleteComment(Long id, Long userId, String role) {
         Comment comment = commentMapper.selectById(id);
         if (comment == null)
-            return Result.error("评论不存在");
+            return Result.error(404, "评论不存在");
         if (!comment.getUserId().equals(userId) && !"ADMIN".equals(role)) {
-            return Result.error("无权删除");
+            return Result.error(403, "无权删除");
         }
         // 级联删除子评论
         List<Comment> children = commentMapper.selectList(

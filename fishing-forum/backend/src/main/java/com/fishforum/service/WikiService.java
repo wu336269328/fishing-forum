@@ -46,7 +46,7 @@ public class WikiService {
     public Result<?> getEntry(Long id) {
         WikiEntry entry = entryMapper.selectById(id);
         if (entry == null)
-            return Result.error("词条不存在");
+            return Result.error(404, "词条不存在");
         // 增加浏览量
         entry.setViewCount(entry.getViewCount() + 1);
         entryMapper.updateById(entry);
@@ -69,7 +69,7 @@ public class WikiService {
     public Result<?> updateEntry(Long id, WikiEntry update, Long userId) {
         WikiEntry entry = entryMapper.selectById(id);
         if (entry == null)
-            return Result.error("词条不存在");
+            return Result.error(404, "词条不存在");
         entry.setContent(update.getContent());
         if (update.getTitle() != null)
             entry.setTitle(update.getTitle());
@@ -91,9 +91,9 @@ public class WikiService {
     public Result<?> deleteEntry(Long id, Long userId, String role) {
         WikiEntry entry = entryMapper.selectById(id);
         if (entry == null)
-            return Result.error("词条不存在");
+            return Result.error(404, "词条不存在");
         if (!entry.getUserId().equals(userId) && !"ADMIN".equals(role))
-            return Result.error("无权删除");
+            return Result.error(403, "无权删除");
         entryMapper.deleteById(id);
         return Result.ok("删除成功");
     }
@@ -114,7 +114,7 @@ public class WikiService {
 
     // 获取分类列表
     public Result<?> getCategories() {
-        List<String> categories = List.of("鱼种", "饵料", "装备", "技巧", "常识");
+        List<String> categories = List.of("鱼种", "饵料", "装备", "技巧", "常识", "鱼种图鉴");
         return Result.ok(categories);
     }
 

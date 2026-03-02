@@ -61,11 +61,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/uploads/**").permitAll()
                         .requestMatchers("/api/upload/**").permitAll()
+                        .requestMatchers("/api/statistics/public").permitAll()
                         .requestMatchers("/ws/**").permitAll()
+                        // 管理员接口（必须在GET公开规则之前！）
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // 所有GET请求公开 - 游客可浏览全部内容
                         .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
-                        // 管理员接口
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // 其余POST/PUT/DELETE需要登录（发帖、评论等写操作）
                         .anyRequest().authenticated())
                 // 在密码验证过滤器前添加JWT过滤器

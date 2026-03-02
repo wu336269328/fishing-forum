@@ -22,7 +22,7 @@
         <el-form-item label="标题"><el-input v-model="editForm.title" /></el-form-item>
         <el-form-item label="分类">
           <el-select v-model="editForm.category" style="width:100%">
-            <el-option v-for="c in ['鱼种','饵料','装备','技巧','常识']" :key="c" :label="c" :value="c" />
+            <el-option v-for="c in ['鱼种','饵料','装备','技巧','常识','鱼种图鉴']" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
         <el-form-item label="内容（Markdown）">

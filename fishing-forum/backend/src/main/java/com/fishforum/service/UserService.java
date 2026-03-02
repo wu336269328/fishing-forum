@@ -29,18 +29,17 @@ public class UserService {
     public Result<?> register(String username, String password, String email) {
         // 输入验证
         if (username == null || username.trim().length() < 2 || username.trim().length() > 20)
-            return Result.error("用户名长度必须在2-20个字符");
+            return Result.error(400, "用户名长度必须在2-20个字符");
         if (password == null || password.length() < 6)
-            return Result.error("密码至少6位");
-        if (email != null && !email.isEmpty() && !email.matches("^[\\w.-]+@[\\w.-]+\\.\\w+$"))
-            return Result.error("邮箱格式不正确");
-        username = username.trim();
+            return Result.error(400, "密码至少6位");
+        if (email == null || !email.matches("^[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}$"))
+            return Result.error(400, "邮箱格式不正确");
+
         // 检查用户名是否已存在
-        if (userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUsername, username)) > 0) {
-            return Result.error("用户名已存在");
-        }
+        if (userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username.trim())) != null)
+            return Result.error(400, "用户名已存在");
         User user = new User();
-        user.setUsername(username);
+        user.setUsername(username.trim());
         user.setPassword(passwordEncoder.encode(password));
         user.setEmail(email);
         user.setAvatar("/default-avatar.png");
@@ -53,12 +52,10 @@ public class UserService {
     // 用户登录
     public Result<?> login(String username, String password) {
         if (username == null || username.isEmpty() || password == null || password.isEmpty())
-            return Result.error("请输入用户名和密码");
-        User user = userMapper.selectOne(
-                new LambdaQueryWrapper<User>().eq(User::getUsername, username));
-        if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
-            return Result.error("用户名或密码错误");
-        }
+            return Result.error(400, "请输入用户名和密码");
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+        if (user == null || !passwordEncoder.matches(password, user.getPassword()))
+            return Result.error(400, "用户名或密码错误");
         // 生成JWT令牌
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
         Map<String, Object> data = new HashMap<>();
@@ -71,7 +68,7 @@ public class UserService {
     public Result<?> getCurrentUser(Long userId) {
         User user = userMapper.selectById(userId);
         if (user == null)
-            return Result.error("用户不存在");
+            return Result.error(404, "用户不存在");
         enrichUser(user);
         return Result.ok(sanitizeUser(user));
     }
@@ -80,7 +77,7 @@ public class UserService {
     public Result<?> getUserProfile(Long userId) {
         User user = userMapper.selectById(userId);
         if (user == null)
-            return Result.error("用户不存在");
+            return Result.error(404, "用户不存在");
         enrichUser(user);
         return Result.ok(sanitizeUser(user));
     }
@@ -89,7 +86,7 @@ public class UserService {
     public Result<?> updateProfile(Long userId, User updateUser) {
         User user = userMapper.selectById(userId);
         if (user == null)
-            return Result.error("用户不存在");
+            return Result.error(404, "用户不存在");
         if (updateUser.getBio() != null)
             user.setBio(updateUser.getBio());
         if (updateUser.getEmail() != null)

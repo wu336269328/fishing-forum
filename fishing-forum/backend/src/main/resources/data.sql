@@ -42,7 +42,13 @@ INSERT INTO tags (name, section_id, color) VALUES
 ('鱼线', 3, '#10b981'),
 ('饵料', 3, '#f59e0b'),
 ('浮漂', 3, '#8b5cf6'),
-('鱼钩', 3, '#ef4444')
+('鱼钩', 3, '#ef4444'),
+('草鱼', NULL, '#22c55e'),
+('鲢鳙', NULL, '#06b6d4'),
+('黑鱼', NULL, '#6366f1'),
+('青鱼', NULL, '#14b8a6'),
+('鲶鱼', NULL, '#f97316'),
+('黄颡鱼', NULL, '#eab308')
 ON CONFLICT DO NOTHING;
 
 -- 示例帖子

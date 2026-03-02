@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS posts (
     content TEXT NOT NULL,
     user_id BIGINT NOT NULL REFERENCES users(id),
     section_id BIGINT NOT NULL REFERENCES sections(id),
+    tag_id BIGINT,
+    post_type VARCHAR(20) DEFAULT 'NORMAL',  -- NORMAL / CATCH / REVIEW
     is_top BOOLEAN DEFAULT FALSE,
     is_featured BOOLEAN DEFAULT FALSE,
     view_count INTEGER DEFAULT 0,
@@ -194,12 +196,47 @@ CREATE TABLE IF NOT EXISTS announcements (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 渔获日记表（帖子扩展表）
+CREATE TABLE IF NOT EXISTS catch_records (
+    id BIGSERIAL PRIMARY KEY,
+    post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    fish_species VARCHAR(100),       -- 鱼种
+    weight DOUBLE PRECISION,         -- 重量(斤)
+    length DOUBLE PRECISION,         -- 长度(cm)
+    bait VARCHAR(200),               -- 饵料
+    spot_name VARCHAR(200),          -- 钓点名称
+    weather VARCHAR(100),            -- 天气
+    photo_url VARCHAR(500),          -- 渔获照片
+    fishing_date DATE,               -- 垂钓日期
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 装备测评表（帖子扩展表）
+CREATE TABLE IF NOT EXISTS gear_reviews (
+    id BIGSERIAL PRIMARY KEY,
+    post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    brand VARCHAR(100),              -- 品牌
+    model VARCHAR(200),              -- 型号
+    gear_category VARCHAR(50),       -- 分类: 鱼竿/鱼线/鱼钩/浮漂/饵料/其他
+    price DOUBLE PRECISION,          -- 价格(元)
+    rating INTEGER CHECK (rating BETWEEN 1 AND 5), -- 评分1-5
+    pros TEXT,                       -- 优点
+    cons TEXT,                       -- 缺点
+    photo_url VARCHAR(500),          -- 装备照片
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================
 -- 索引优化
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_posts_section ON posts(section_id);
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_type ON posts(post_type);
+CREATE INDEX IF NOT EXISTS idx_posts_tag ON posts(tag_id);
+CREATE INDEX IF NOT EXISTS idx_posts_views ON posts(view_count DESC);
+CREATE INDEX IF NOT EXISTS idx_catch_records_post ON catch_records(post_id);
+CREATE INDEX IF NOT EXISTS idx_gear_reviews_post ON gear_reviews(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, is_read);

@@ -25,6 +25,8 @@
               <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
             </div>
             <div style="margin-left:auto; display:flex; gap:4px">
+              <el-tag v-if="post.postType==='CATCH'" size="small" type="success">🐟 渔获</el-tag>
+              <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning">⭐ 测评</el-tag>
               <el-tag v-if="post.isTop" size="small" type="danger">置顶</el-tag>
               <el-tag v-if="post.isFeatured" size="small" type="warning">精华</el-tag>
             </div>
@@ -33,6 +35,7 @@
           <div class="post-excerpt">{{ stripHtml(post.content) }}</div>
           <div class="post-meta">
             <span>{{ post.sectionName }}</span>
+            <span v-if="post.tagName" style="color:#1a73e8">#{{ post.tagName }}</span>
             <span>👁 {{ post.viewCount }}</span>
             <span>💬 {{ post.commentCount }}</span>
             <span>👍 {{ post.likeCount }}</span>
@@ -51,14 +54,38 @@
             <span class="text-muted">{{ s.postCount || 0 }}</span>
           </div>
         </div>
+
+        <!-- 热门帖子 -->
+        <div class="card" v-if="hotPosts.length">
+          <h3 style="font-size:14px; margin-bottom:10px">🔥 热门帖子</h3>
+          <div v-for="(hp, i) in hotPosts" :key="hp.id" class="side-item" style="cursor:pointer" @click="$router.push(`/post/${hp.id}`)">
+            <span class="hot-rank" :class="'rank-'+(i+1)">{{ i+1 }}</span>
+            <span style="font-size:13px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ hp.title }}</span>
+            <span class="text-muted" style="flex-shrink:0">{{ hp.viewCount }}</span>
+          </div>
+        </div>
+
+        <!-- 热门标签 -->
+        <div class="card" v-if="hotTags.length">
+          <h3 style="font-size:14px; margin-bottom:10px">🏷️ 热门标签</h3>
+          <div class="tag-cloud">
+            <router-link v-for="tag in hotTags" :key="tag.id" :to="`/forum?tagId=${tag.id}`" class="tag-item" :style="{background:tag.color+'20', color:tag.color, borderColor:tag.color+'40'}">
+              #{{ tag.name }}
+            </router-link>
+          </div>
+        </div>
+
         <!-- 快捷入口 -->
         <div class="card">
           <h3 style="font-size:14px; margin-bottom:10px">🔗 快捷入口</h3>
           <router-link to="/post/create" class="quick-link">📝 发表帖子</router-link>
+          <router-link to="/forum?postType=CATCH" class="quick-link">🐟 渔获日记</router-link>
+          <router-link to="/forum?postType=REVIEW" class="quick-link">⭐ 装备测评</router-link>
           <router-link to="/spots" class="quick-link">📍 钓点推荐</router-link>
           <router-link to="/wiki" class="quick-link">📖 钓鱼百科</router-link>
           <router-link to="/weather" class="quick-link">🌤 天气查询</router-link>
         </div>
+
         <!-- 活跃用户 -->
         <div class="card" v-if="activeUsers.length">
           <h3 style="font-size:14px; margin-bottom:10px">🏆 活跃钓友</h3>
@@ -76,7 +103,8 @@
 import { ref, onMounted } from 'vue'
 import request from '../api/request'
 
-const posts = ref([]), sections = ref([]), announcements = ref([]), stats = ref({}), activeUsers = ref([])
+const posts = ref([]), sections = ref([]), announcements = ref([]), stats = ref({})
+const activeUsers = ref([]), hotPosts = ref([]), hotTags = ref([])
 
 const formatTime = (t) => {
   if (!t) return ''
@@ -89,14 +117,18 @@ const formatTime = (t) => {
 const stripHtml = (h) => h ? h.replace(/<[^>]+>/g, '').substring(0, 120) : ''
 
 onMounted(async () => {
-  const [p, s, a] = await Promise.all([
+  const [p, s, a, hp, ht] = await Promise.all([
     request.get('/api/posts', { params: { page: 1, size: 10 } }),
     request.get('/api/sections'),
-    request.get('/api/announcements')
+    request.get('/api/announcements'),
+    request.get('/api/posts/hot', { params: { limit: 5 } }),
+    request.get('/api/tags/hot', { params: { limit: 15 } })
   ])
   if (p.code === 200) posts.value = p.data.records || []
   if (s.code === 200) sections.value = s.data || []
   if (a.code === 200) announcements.value = (a.data || []).filter(x => x.isActive)
+  if (hp.code === 200) hotPosts.value = hp.data || []
+  if (ht.code === 200) hotTags.value = ht.data || []
   // 获取统计数据（使用公开接口）
   try { const r = await request.get('/api/statistics/public'); if (r.code === 200) stats.value = r.data } catch (e) {
     stats.value = { postCount: posts.value.length, userCount: '-', spotCount: '-', wikiCount: '-' }
@@ -105,7 +137,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home-grid { display: grid; grid-template-columns: 1fr 240px; gap: 16px; }
+.home-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
 .post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .post-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #222; }
@@ -116,5 +148,12 @@ onMounted(async () => {
 .side-item a:hover { color: #1a73e8; }
 .quick-link { display: block; padding: 5px 0; font-size: 13px; color: #555; }
 .quick-link:hover { color: #1a73e8; }
+.hot-rank { width: 18px; height: 18px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: #f0f0f0; color: #999; flex-shrink: 0; }
+.rank-1 { background: #ff4d4f; color: #fff; }
+.rank-2 { background: #ff7a45; color: #fff; }
+.rank-3 { background: #ffa940; color: #fff; }
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-item { padding: 2px 8px; border-radius: 12px; font-size: 12px; border: 1px solid; text-decoration: none; transition: opacity 0.15s; }
+.tag-item:hover { opacity: 0.7; }
 @media (max-width: 768px) { .home-grid { grid-template-columns: 1fr; } .side-col { display: none; } }
 </style>

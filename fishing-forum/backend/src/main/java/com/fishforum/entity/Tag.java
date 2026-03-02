@@ -14,4 +14,7 @@ public class Tag {
     private String name;
     private Long sectionId;
     private String color;
+
+    @TableField(exist = false)
+    private Integer postCount;
 }

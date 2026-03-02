@@ -8,7 +8,37 @@
           <div class="text-muted">{{ post.sectionName }} · {{ formatTime(post.createdAt) }} · {{ post.viewCount }} 次浏览</div>
         </div>
       </div>
-      <h1 style="font-size:20px; margin-bottom:12px">{{ post.title }}</h1>
+      <h1 style="font-size:20px; margin-bottom:12px">
+        <el-tag v-if="post.postType==='CATCH'" size="small" type="success" style="margin-right:6px">🐟 渔获</el-tag>
+        <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning" style="margin-right:6px">⭐ 测评</el-tag>
+        {{ post.title }}
+      </h1>
+
+      <!-- 渔获信息卡 -->
+      <div v-if="catchRecord" class="meta-card catch-card">
+        <div class="meta-grid">
+          <div v-if="catchRecord.fishSpecies"><span class="meta-label">🐟 鱼种</span>{{ catchRecord.fishSpecies }}</div>
+          <div v-if="catchRecord.weight"><span class="meta-label">⚖️ 重量</span>{{ catchRecord.weight }} 斤</div>
+          <div v-if="catchRecord.bait"><span class="meta-label">🪤 饵料</span>{{ catchRecord.bait }}</div>
+          <div v-if="catchRecord.spotName"><span class="meta-label">📍 钓点</span>{{ catchRecord.spotName }}</div>
+          <div v-if="catchRecord.weather"><span class="meta-label">☀️ 天气</span>{{ catchRecord.weather }}</div>
+          <div v-if="catchRecord.fishingDate"><span class="meta-label">📅 日期</span>{{ catchRecord.fishingDate }}</div>
+        </div>
+      </div>
+
+      <!-- 装备测评信息卡 -->
+      <div v-if="gearReview" class="meta-card review-card">
+        <div class="meta-grid">
+          <div v-if="gearReview.brand"><span class="meta-label">🏷️ 品牌</span>{{ gearReview.brand }}</div>
+          <div v-if="gearReview.model"><span class="meta-label">📦 型号</span>{{ gearReview.model }}</div>
+          <div v-if="gearReview.gearCategory"><span class="meta-label">📚 分类</span>{{ gearReview.gearCategory }}</div>
+          <div v-if="gearReview.price"><span class="meta-label">💰 价格</span>￥{{ gearReview.price }}</div>
+          <div v-if="gearReview.rating"><span class="meta-label">⭐ 评分</span>{{ '⭐'.repeat(gearReview.rating) }}</div>
+        </div>
+        <div v-if="gearReview.pros" style="margin-top:8px; font-size:13px"><span style="color:#10b981; font-weight:500">✅ 优点：</span>{{ gearReview.pros }}</div>
+        <div v-if="gearReview.cons" style="margin-top:4px; font-size:13px"><span style="color:#ef4444; font-weight:500">❌ 缺点：</span>{{ gearReview.cons }}</div>
+      </div>
+
       <div class="post-body" v-html="sanitizedContent"></div>
       <div style="margin-top:16px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px">
         <el-button size="small" :type="post.liked?'primary':''" @click="toggleLike">👍 {{ post.likeCount }}</el-button>
@@ -75,6 +105,7 @@ import DOMPurify from 'dompurify'
 
 const route = useRoute(), router = useRouter(), userStore = useUserStore()
 const post = ref(null), comments = ref([]), commentContent = ref(''), replyContent = ref(''), replyTarget = ref(null), showReport = ref(false), reportReason = ref('')
+const catchRecord = ref(null), gearReview = ref(null)
 const isOwner = computed(() => post.value && userStore.userId === post.value.userId)
 const isAdmin = computed(() => userStore.isAdmin)
 
@@ -89,7 +120,13 @@ const requireLogin = (action) => {
 }
 
 onMounted(async () => {
-  const r = await request.get(`/api/posts/${route.params.id}`); if (r.code === 200) post.value = r.data
+  const r = await request.get(`/api/posts/${route.params.id}`)
+  if (r.code === 200) {
+    // 新的响应格式: { post, catchRecord, gearReview }
+    post.value = r.data.post || r.data
+    catchRecord.value = r.data.catchRecord || null
+    gearReview.value = r.data.gearReview || null
+  }
   const c = await request.get(`/api/comments/${route.params.id}`); if (c.code === 200) comments.value = c.data || []
 })
 
@@ -126,4 +163,9 @@ const deletePost = async () => {
 .post-body { line-height: 1.8; font-size: 15px; color: #444; }
 .post-body :deep(img) { max-width: 100%; border-radius: 4px; }
 .comment-item { padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+.meta-card { border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-size: 13px; }
+.catch-card { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.review-card { background: #fffbeb; border: 1px solid #fde68a; }
+.meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 16px; }
+.meta-label { font-weight: 500; margin-right: 4px; color: #666; }
 </style>

@@ -3,14 +3,63 @@
     <h1 class="page-title">发帖</h1>
     <div class="card">
       <el-form label-position="top">
+        <!-- 帖子类型 -->
+        <el-form-item label="帖子类型">
+          <el-radio-group v-model="form.postType" size="small">
+            <el-radio-button value="NORMAL">💬 普通讨论</el-radio-button>
+            <el-radio-button value="CATCH">🐟 渔获日记</el-radio-button>
+            <el-radio-button value="REVIEW">⭐ 装备测评</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="板块">
           <el-select v-model="form.sectionId" placeholder="选择板块" style="width:100%">
             <el-option v-for="s in sections" :key="s.id" :label="`${s.icon} ${s.name}`" :value="s.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="标签">
+          <el-select v-model="form.tagId" placeholder="选择标签（可选）" clearable style="width:100%">
+            <el-option v-for="t in tags" :key="t.id" :label="t.name" :value="t.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="标题">
           <el-input v-model="form.title" placeholder="标题（5-200字）" maxlength="200" show-word-limit />
         </el-form-item>
+
+        <!-- 渔获日记表单 -->
+        <div v-if="form.postType==='CATCH'" class="sub-form">
+          <h4 style="font-size:14px; margin-bottom:8px; color:#10b981">🐟 渔获信息</h4>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+            <el-form-item label="鱼种"><el-input v-model="catchForm.fishSpecies" placeholder="如：鲫鱼" /></el-form-item>
+            <el-form-item label="重量(斤)"><el-input-number v-model="catchForm.weight" :min="0" :precision="1" style="width:100%" /></el-form-item>
+            <el-form-item label="饵料"><el-input v-model="catchForm.bait" placeholder="如：蚯蚓、商品饵" /></el-form-item>
+            <el-form-item label="钓点"><el-input v-model="catchForm.spotName" placeholder="如：翠湖水库" /></el-form-item>
+            <el-form-item label="天气"><el-input v-model="catchForm.weather" placeholder="如：晴 微风" /></el-form-item>
+            <el-form-item label="垂钓日期"><el-date-picker v-model="catchForm.fishingDate" type="date" value-format="YYYY-MM-DD" style="width:100%" /></el-form-item>
+          </div>
+        </div>
+
+        <!-- 装备测评表单 -->
+        <div v-if="form.postType==='REVIEW'" class="sub-form">
+          <h4 style="font-size:14px; margin-bottom:8px; color:#f59e0b">⭐ 装备信息</h4>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+            <el-form-item label="品牌"><el-input v-model="reviewForm.brand" placeholder="如：光威、化氏" /></el-form-item>
+            <el-form-item label="型号"><el-input v-model="reviewForm.model" placeholder="如：天流 V4.5米" /></el-form-item>
+            <el-form-item label="分类">
+              <el-select v-model="reviewForm.gearCategory" style="width:100%">
+                <el-option label="鱼竿" value="鱼竿" /><el-option label="鱼线" value="鱼线" />
+                <el-option label="鱼钩" value="鱼钩" /><el-option label="浮漂" value="浮漂" />
+                <el-option label="饵料" value="饵料" /><el-option label="其他" value="其他" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="价格(元)"><el-input-number v-model="reviewForm.price" :min="0" style="width:100%" /></el-form-item>
+            <el-form-item label="评分">
+              <el-rate v-model="reviewForm.rating" />
+            </el-form-item>
+          </div>
+          <el-form-item label="优点"><el-input v-model="reviewForm.pros" type="textarea" :rows="2" placeholder="这款装备的优点..." /></el-form-item>
+          <el-form-item label="缺点"><el-input v-model="reviewForm.cons" type="textarea" :rows="2" placeholder="这款装备的不足..." /></el-form-item>
+        </div>
+
         <el-form-item label="内容">
           <el-input v-model="form.content" type="textarea" :rows="10" placeholder="帖子内容..." />
         </el-form-item>
@@ -37,13 +86,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '../api/request'
 
-const router = useRouter(), loading = ref(false), uploading = ref(false), sections = ref([]), images = ref([])
-const form = ref({ title: '', content: '', sectionId: null })
+const router = useRouter(), loading = ref(false), uploading = ref(false)
+const sections = ref([]), tags = ref([]), images = ref([])
+const form = ref({ title: '', content: '', sectionId: null, tagId: null, postType: 'NORMAL' })
+const catchForm = ref({ fishSpecies: '', weight: null, bait: '', spotName: '', weather: '', fishingDate: '' })
+const reviewForm = ref({ brand: '', model: '', gearCategory: '鱼竿', price: null, rating: 3, pros: '', cons: '' })
 
 const uploadImage = async (e) => {
   const file = e.target.files[0]; if (!file) return
@@ -58,6 +110,13 @@ const uploadImage = async (e) => {
   e.target.value = ''
 }
 
+const loadTags = async () => {
+  const params = form.value.sectionId ? { sectionId: form.value.sectionId } : {}
+  const r = await request.get('/api/tags', { params })
+  if (r.code === 200) tags.value = r.data || []
+}
+watch(() => form.value.sectionId, loadTags)
+
 const handleSubmit = async () => {
   if (!form.value.sectionId) return ElMessage.warning('选择板块')
   if (!form.value.title || form.value.title.length < 5) return ElMessage.warning('标题至少5字')
@@ -66,16 +125,25 @@ const handleSubmit = async () => {
   let content = form.value.content || ''
   if (!content.includes('<')) content = content.split('\n').filter(Boolean).map(p => `<p>${p}</p>`).join('')
   if (images.value.length) content += images.value.map(url => `<p><img src="${url}" style="max-width:100%"/></p>`).join('')
-  const r = await request.post('/api/posts', { ...form.value, content })
+
+  const body = { ...form.value, content }
+  if (form.value.postType === 'CATCH') body.catchRecord = catchForm.value
+  if (form.value.postType === 'REVIEW') body.gearReview = reviewForm.value
+
+  const r = await request.post('/api/posts', body)
   if (r.code === 200) { ElMessage.success('发帖成功'); router.push(`/post/${r.data.id}`) }
   else ElMessage.error(r.message)
   loading.value = false
 }
 
-onMounted(async () => { const r = await request.get('/api/sections'); if (r.code === 200) sections.value = r.data || [] })
+onMounted(async () => {
+  const r = await request.get('/api/sections'); if (r.code === 200) sections.value = r.data || []
+  await loadTags()
+})
 </script>
 
 <style scoped>
+.sub-form { background: #f9fafb; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #e5e7eb; }
 .img-preview { position: relative; width: 80px; height: 80px; border-radius: 6px; overflow: hidden; border: 1px solid #eee; }
 .img-preview img { width: 100%; height: 100%; object-fit: cover; }
 .img-del { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: #fff; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
