@@ -27,13 +27,21 @@ public class UserService {
 
     // 用户注册
     public Result<?> register(String username, String password, String email) {
+        // 输入验证
+        if (username == null || username.trim().length() < 2 || username.trim().length() > 20)
+            return Result.error("用户名长度必须在2-20个字符");
+        if (password == null || password.length() < 6)
+            return Result.error("密码至少6位");
+        if (email != null && !email.isEmpty() && !email.matches("^[\\w.-]+@[\\w.-]+\\.\\w+$"))
+            return Result.error("邮箱格式不正确");
+        username = username.trim();
         // 检查用户名是否已存在
         if (userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUsername, username)) > 0) {
             return Result.error("用户名已存在");
         }
         User user = new User();
         user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(password)); // 密码加密
+        user.setPassword(passwordEncoder.encode(password));
         user.setEmail(email);
         user.setAvatar("/default-avatar.png");
         user.setRole("USER");
@@ -44,6 +52,8 @@ public class UserService {
 
     // 用户登录
     public Result<?> login(String username, String password) {
+        if (username == null || username.isEmpty() || password == null || password.isEmpty())
+            return Result.error("请输入用户名和密码");
         User user = userMapper.selectOne(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null || !passwordEncoder.matches(password, user.getPassword())) {

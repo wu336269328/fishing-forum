@@ -45,6 +45,10 @@ public class InteractionService {
 
     // 发表评论
     public Result<?> addComment(Long postId, String content, Long parentId, Long userId) {
+        if (content == null || content.trim().isEmpty())
+            return Result.error("评论内容不能为空");
+        if (content.length() > 2000)
+            return Result.error("评论内容不能超过2000字");
         Comment comment = new Comment();
         comment.setPostId(postId);
         comment.setContent(content);
@@ -69,11 +73,18 @@ public class InteractionService {
         if (!comment.getUserId().equals(userId) && !"ADMIN".equals(role)) {
             return Result.error("无权删除");
         }
+        // 级联删除子评论
+        List<Comment> children = commentMapper.selectList(
+                new LambdaQueryWrapper<Comment>().eq(Comment::getParentId, id));
+        int deletedCount = 1 + children.size();
+        for (Comment child : children) {
+            commentMapper.deleteById(child.getId());
+        }
         commentMapper.deleteById(id);
         // 减少帖子评论数
         Post post = postMapper.selectById(comment.getPostId());
-        if (post != null && post.getCommentCount() > 0) {
-            post.setCommentCount(post.getCommentCount() - 1);
+        if (post != null && post.getCommentCount() >= deletedCount) {
+            post.setCommentCount(post.getCommentCount() - deletedCount);
             postMapper.updateById(post);
         }
         return Result.ok("删除成功");

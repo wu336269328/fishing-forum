@@ -58,6 +58,10 @@
     </div>
     <el-empty v-if="!userPosts.length" description="暂无帖子" :image-size="40" />
   </div>
+  <div v-else class="card" style="text-align:center; padding:40px">
+    <p style="font-size:15px; color:#666; margin-bottom:12px">请先登录查看个人中心</p>
+    <router-link to="/login"><el-button type="primary">去登录</el-button></router-link>
+  </div>
 </template>
 
 <script setup>
@@ -75,7 +79,8 @@ const fileInput = ref(null)
 const isOwn = computed(() => { const id = route.params.id ? Number(route.params.id) : userStore.userId; return id === userStore.userId })
 
 const load = async () => {
-  const id = route.params.id || userStore.userId; if (!id) return
+  const id = route.params.id || userStore.userId
+  if (!id) { profile.value = null; return }
   const r = await request.get(`/api/users/${id}/profile`); if (r.code === 200) { profile.value = r.data; editForm.value = { bio: r.data.bio || '', email: r.data.email || '' } }
   const p = await request.get(`/api/users/${id}/posts`, { params: { page: 1, size: 20 } }); if (p.code === 200) userPosts.value = p.data.records || p.data || []
   if (!isOwn.value && userStore.isLoggedIn) { try { const f = await request.get(`/api/follows/check/${id}`); if (f.code === 200) isFollowing.value = f.data } catch (e) { } }

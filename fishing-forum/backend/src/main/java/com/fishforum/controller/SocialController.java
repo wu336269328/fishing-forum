@@ -29,6 +29,8 @@ public class SocialController {
     // 检查是否已关注
     @GetMapping("/follows/check/{followingId}")
     public Result<?> checkFollow(@PathVariable Long followingId, Authentication auth) {
+        if (auth == null)
+            return Result.ok(false);
         return socialService.checkFollow(followingId, (Long) auth.getPrincipal());
     }
 
@@ -65,6 +67,8 @@ public class SocialController {
     // 获取最近对话列表
     @GetMapping("/messages")
     public Result<?> getRecentConversations(Authentication auth) {
+        if (auth == null)
+            return Result.error(401, "请先登录");
         return socialService.getRecentConversations((Long) auth.getPrincipal());
     }
 
@@ -75,12 +79,16 @@ public class SocialController {
     public Result<?> getNotifications(Authentication auth,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
+        if (auth == null)
+            return Result.error(401, "请先登录");
         return socialService.getNotifications((Long) auth.getPrincipal(), page, size);
     }
 
     // 获取未读数
     @GetMapping("/notifications/unread-count")
     public Result<?> getUnreadCount(Authentication auth) {
+        if (auth == null)
+            return Result.ok(java.util.Map.of("total", 0, "messages", 0, "notifications", 0));
         return socialService.getUnreadCount((Long) auth.getPrincipal());
     }
 

@@ -57,6 +57,8 @@ public class InteractionController {
     // 获取用户收藏
     @GetMapping("/favorites")
     public Result<?> getUserFavorites(Authentication auth) {
+        if (auth == null)
+            return Result.error(401, "请先登录");
         return interactionService.getUserFavorites((Long) auth.getPrincipal());
     }
 

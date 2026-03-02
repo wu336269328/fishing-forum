@@ -80,6 +80,13 @@ public class PostService {
 
     // 发帖
     public Result<?> createPost(Post post, Long userId) {
+        if (post.getTitle() == null || post.getTitle().trim().isEmpty())
+            return Result.error("标题不能为空");
+        if (post.getTitle().length() > 100)
+            return Result.error("标题不能超过100个字符");
+        if (post.getContent() == null || post.getContent().trim().isEmpty())
+            return Result.error("内容不能为空");
+        post.setTitle(post.getTitle().trim());
         post.setUserId(userId);
         post.setViewCount(0);
         post.setLikeCount(0);
@@ -120,6 +127,12 @@ public class PostService {
             return Result.error("无权删除");
         }
         postMapper.deleteById(id);
+        // 减少板块帖子计数
+        Section section = sectionMapper.selectById(post.getSectionId());
+        if (section != null && section.getPostCount() > 0) {
+            section.setPostCount(section.getPostCount() - 1);
+            sectionMapper.updateById(section);
+        }
         return Result.ok("删除成功");
     }
 

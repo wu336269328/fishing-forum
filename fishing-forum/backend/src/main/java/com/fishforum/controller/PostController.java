@@ -2,6 +2,7 @@ package com.fishforum.controller;
 
 import com.fishforum.common.Result;
 import com.fishforum.entity.Post;
+import com.fishforum.service.AdminService;
 import com.fishforum.service.PostService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -16,6 +17,13 @@ import org.springframework.web.bind.annotation.*;
 public class PostController {
 
     private final PostService postService;
+    private final AdminService adminService;
+
+    // 公开统计接口（首页用，无需登录）
+    @GetMapping("/statistics/public")
+    public Result<?> getPublicStats() {
+        return adminService.getStatistics();
+    }
 
     // 获取帖子列表（公开）
     @GetMapping("/posts")

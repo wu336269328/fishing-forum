@@ -97,9 +97,9 @@ onMounted(async () => {
   if (p.code === 200) posts.value = p.data.records || []
   if (s.code === 200) sections.value = s.data || []
   if (a.code === 200) announcements.value = (a.data || []).filter(x => x.isActive)
-  // 尝试获取统计
-  try { const r = await request.get('/api/admin/statistics'); if (r.code === 200) stats.value = r.data } catch (e) {
-    stats.value = { postCount: posts.value.length, userCount: '?', spotCount: '?', wikiCount: '?' }
+  // 获取统计数据（使用公开接口）
+  try { const r = await request.get('/api/statistics/public'); if (r.code === 200) stats.value = r.data } catch (e) {
+    stats.value = { postCount: posts.value.length, userCount: '-', spotCount: '-', wikiCount: '-' }
   }
 })
 </script>

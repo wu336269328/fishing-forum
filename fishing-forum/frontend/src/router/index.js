@@ -8,6 +8,7 @@ const routes = [
     { path: '/forum', name: 'Forum', component: () => import('../views/ForumView.vue'), meta: { title: '论坛' } },
     { path: '/post/:id', name: 'PostDetail', component: () => import('../views/PostDetailView.vue'), meta: { title: '帖子详情' } },
     { path: '/post/create', name: 'CreatePost', component: () => import('../views/CreatePostView.vue'), meta: { title: '发帖', auth: true } },
+    { path: '/post/edit/:id', name: 'EditPost', component: () => import('../views/EditPostView.vue'), meta: { title: '编辑帖子', auth: true } },
     { path: '/profile/:id?', name: 'Profile', component: () => import('../views/ProfileView.vue'), meta: { title: '个人中心' } },
     { path: '/spots', name: 'Spots', component: () => import('../views/SpotMapView.vue'), meta: { title: '钓点地图' } },
     { path: '/wiki', name: 'Wiki', component: () => import('../views/WikiView.vue'), meta: { title: '知识百科' } },

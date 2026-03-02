@@ -9,11 +9,13 @@
         </div>
       </div>
       <h1 style="font-size:20px; margin-bottom:12px">{{ post.title }}</h1>
-      <div class="post-body" v-html="post.content"></div>
+      <div class="post-body" v-html="sanitizedContent"></div>
       <div style="margin-top:16px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px">
         <el-button size="small" :type="post.liked?'primary':''" @click="toggleLike">👍 {{ post.likeCount }}</el-button>
         <el-button size="small" :type="post.favorited?'warning':''" @click="toggleFavorite">{{ post.favorited?'⭐ 已收藏':'☆ 收藏' }}</el-button>
         <el-button size="small" @click="showReport=true">🚩 举报</el-button>
+        <el-button v-if="isOwner" size="small" @click="$router.push(`/post/edit/${post.id}`)">✏️ 编辑</el-button>
+        <el-button v-if="isOwner||isAdmin" size="small" type="danger" @click="deletePost">🗑 删除</el-button>
       </div>
     </div>
 
@@ -34,7 +36,7 @@
           <img :src="c.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
           <span class="text-link" style="font-size:13px">{{ c.authorName }}</span>
           <span class="text-muted">{{ formatTime(c.createdAt) }}</span>
-          <span class="text-muted text-link" style="margin-left:auto" @click="replyTarget=c">回复</span>
+          <span v-if="userStore.isLoggedIn" class="text-muted text-link" style="margin-left:auto" @click="replyTarget=c">回复</span>
         </div>
         <p style="font-size:14px; padding-left:40px; margin-bottom:4px">{{ c.content }}</p>
         <div v-if="replyTarget?.id===c.id" style="display:flex; gap:6px; margin:6px 0 0 40px">
@@ -64,16 +66,27 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../api/request'
+import DOMPurify from 'dompurify'
 
-const route = useRoute(), userStore = useUserStore()
+const route = useRoute(), router = useRouter(), userStore = useUserStore()
 const post = ref(null), comments = ref([]), commentContent = ref(''), replyContent = ref(''), replyTarget = ref(null), showReport = ref(false), reportReason = ref('')
+const isOwner = computed(() => post.value && userStore.userId === post.value.userId)
+const isAdmin = computed(() => userStore.isAdmin)
+
+// XSS安全：用DOMPurify过滤帖子HTML内容
+const sanitizedContent = computed(() => post.value ? DOMPurify.sanitize(post.value.content) : '')
 
 const formatTime = (t) => { if (!t) return ''; const d = new Date(t), now = new Date(), diff = (now - d) / 1000; if (diff < 60) return '刚刚'; if (diff < 3600) return Math.floor(diff / 60) + '分钟前'; if (diff < 86400) return Math.floor(diff / 3600) + '小时前'; return d.toLocaleDateString('zh-CN') }
+
+const requireLogin = (action) => {
+  if (!userStore.isLoggedIn) { ElMessage.warning('请先登录'); router.push('/login'); return false }
+  return true
+}
 
 onMounted(async () => {
   const r = await request.get(`/api/posts/${route.params.id}`); if (r.code === 200) post.value = r.data
@@ -81,14 +94,32 @@ onMounted(async () => {
 })
 
 const submitComment = async (parentId) => {
+  if (!requireLogin()) return
   const content = parentId ? replyContent.value : commentContent.value
   if (!content.trim()) return
   const r = await request.post('/api/comments', { postId: post.value.id, content, parentId })
   if (r.code === 200) { ElMessage.success('评论成功'); commentContent.value = ''; replyContent.value = ''; replyTarget.value = null; const c = await request.get(`/api/comments/${route.params.id}`); if (c.code === 200) comments.value = c.data || []; post.value.commentCount++ }
 }
-const toggleLike = async () => { const r = await request.post('/api/likes', { targetId: post.value.id, targetType: 'POST' }); if (r.code === 200) { post.value.liked = !post.value.liked; post.value.likeCount += post.value.liked ? 1 : -1 } }
-const toggleFavorite = async () => { const r = await request.post('/api/favorites', { postId: post.value.id }); if (r.code === 200) { post.value.favorited = !post.value.favorited; ElMessage.success(r.message) } }
-const submitReport = async () => { if (!reportReason.value.trim()) return ElMessage.warning('请填写原因'); await request.post('/api/reports', { targetId: post.value.id, targetType: 'POST', reason: reportReason.value }); showReport.value = false; reportReason.value = ''; ElMessage.success('已提交') }
+const toggleLike = async () => {
+  if (!requireLogin()) return
+  const r = await request.post('/api/likes', { targetId: post.value.id, targetType: 'POST' }); if (r.code === 200) { post.value.liked = !post.value.liked; post.value.likeCount += post.value.liked ? 1 : -1 }
+}
+const toggleFavorite = async () => {
+  if (!requireLogin()) return
+  const r = await request.post('/api/favorites', { postId: post.value.id }); if (r.code === 200) { post.value.favorited = !post.value.favorited; ElMessage.success(r.message) }
+}
+const submitReport = async () => {
+  if (!requireLogin()) return
+  if (!reportReason.value.trim()) return ElMessage.warning('请填写原因'); await request.post('/api/reports', { targetId: post.value.id, targetType: 'POST', reason: reportReason.value }); showReport.value = false; reportReason.value = ''; ElMessage.success('已提交')
+}
+const deletePost = async () => {
+  try {
+    await ElMessageBox.confirm('确定要删除这篇帖子吗？', '删除确认', { type: 'warning' })
+    const r = await request.delete(`/api/posts/${post.value.id}`)
+    if (r.code === 200) { ElMessage.success('已删除'); router.push('/forum') }
+    else ElMessage.error(r.message)
+  } catch (e) { /* cancelled */ }
+}
 </script>
 
 <style scoped>
