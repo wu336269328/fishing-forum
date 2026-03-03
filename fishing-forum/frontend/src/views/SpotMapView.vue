@@ -8,23 +8,25 @@
       </el-select>
       <el-button type="primary" size="small" @click="showAdd=true">+ 分享钓点</el-button>
     </div>
-    <div v-for="s in spots" :key="s.id" class="card spot-card" @click="selected=s; showDetail=true">
-      <div style="display:flex; gap:12px">
-        <img v-if="s.imageUrl" :src="s.imageUrl" class="spot-thumb" />
-        <div style="flex:1">
-          <div style="display:flex; justify-content:space-between; align-items:center">
-            <b>{{ s.name }}</b>
-            <el-tag size="small">{{ s.spotType }}</el-tag>
-          </div>
-          <p style="font-size:13px; color:#777; margin:4px 0; line-height:1.4">{{ s.description?.substring(0,80) }}</p>
-          <div style="font-size:12px; color:#999; display:flex; gap:12px; flex-wrap:wrap">
-            <span>🐟 {{ s.fishTypes }}</span>
-            <span>⭐ {{ s.rating }}</span>
-            <span>🕐 {{ s.openTime }}</span>
-          </div>
-          <div style="font-size:12px; margin-top:4px; display:flex; gap:8px">
-            <a :href="toGoogleMap(s)" target="_blank" @click.stop class="map-link">📍 谷歌地图</a>
-            <a :href="toAmapLink(s)" target="_blank" @click.stop class="map-link">🗺️ 高德地图</a>
+    <div class="spots-grid">
+      <div v-for="s in spots" :key="s.id" class="card spot-card" @click="selected=s; showDetail=true">
+        <div style="display:flex; gap:12px">
+          <img v-if="s.imageUrl" :src="s.imageUrl" class="spot-thumb" />
+          <div style="flex:1; min-width:0">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <b>{{ s.name }}</b>
+              <el-tag size="small">{{ s.spotType }}</el-tag>
+            </div>
+            <p style="font-size:13px; color:#777; margin:4px 0; line-height:1.4">{{ s.description?.substring(0,80) }}</p>
+            <div style="font-size:12px; color:#999; display:flex; gap:12px; flex-wrap:wrap">
+              <span>🐟 {{ s.fishTypes }}</span>
+              <span>⭐ {{ s.rating }}</span>
+              <span>🕐 {{ s.openTime }}</span>
+            </div>
+            <div style="font-size:12px; margin-top:4px; display:flex; gap:8px">
+              <a :href="toGoogleMap(s)" target="_blank" @click.stop class="map-link">📍 谷歌地图</a>
+              <a :href="toAmapLink(s)" target="_blank" @click.stop class="map-link">🗺️ 高德地图</a>
+            </div>
           </div>
         </div>
       </div>
@@ -147,8 +149,9 @@ onMounted(loadSpots)
 </script>
 
 <style scoped>
-.spot-card { cursor: pointer; transition: box-shadow 0.15s; }
+.spot-card { cursor: pointer; transition: box-shadow 0.15s; margin-bottom: 0; }
 .spot-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.spots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .spot-thumb { width: 100px; height: 75px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
 .map-link { color: #1a73e8; font-size: 12px; text-decoration: none; }
 .map-link:hover { text-decoration: underline; }
@@ -156,4 +159,5 @@ onMounted(loadSpots)
 .map-btn:hover { background: #1558b0; }
 .img-upload-btn { width: 80px; height: 80px; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #999; cursor: pointer; text-align: center; padding: 4px; }
 .img-upload-btn:hover { border-color: #1a73e8; color: #1a73e8; }
+@media (max-width: 900px) { .spots-grid { grid-template-columns: 1fr; } }
 </style>

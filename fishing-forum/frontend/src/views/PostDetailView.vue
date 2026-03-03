@@ -1,91 +1,129 @@
 <template>
-  <div v-if="post">
-    <div class="card">
-      <div class="card-header" style="margin-bottom:12px">
-        <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-md" @click="$router.push(`/profile/${post.userId}`)" style="cursor:pointer" />
-        <div>
-          <span class="text-link" @click="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
-          <div class="text-muted">{{ post.sectionName }} · {{ formatTime(post.createdAt) }} · {{ post.viewCount }} 次浏览</div>
+  <div v-if="post" class="detail-grid">
+    <!-- 主内容区 -->
+    <div class="main-col">
+      <div class="card">
+        <div class="card-header" style="margin-bottom:12px">
+          <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-md" @click="$router.push(`/profile/${post.userId}`)" style="cursor:pointer" />
+          <div>
+            <span class="text-link" @click="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
+            <div class="text-muted">{{ post.sectionName }} · {{ formatTime(post.createdAt) }} · {{ post.viewCount }} 次浏览</div>
+          </div>
+        </div>
+        <h1 style="font-size:20px; margin-bottom:12px">
+          <el-tag v-if="post.postType==='CATCH'" size="small" type="success" style="margin-right:6px">🐟 渔获</el-tag>
+          <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning" style="margin-right:6px">⭐ 测评</el-tag>
+          {{ post.title }}
+        </h1>
+
+        <!-- 渔获信息卡 -->
+        <div v-if="catchRecord" class="meta-card catch-card">
+          <div class="meta-grid">
+            <div v-if="catchRecord.fishSpecies"><span class="meta-label">🐟 鱼种</span>{{ catchRecord.fishSpecies }}</div>
+            <div v-if="catchRecord.weight"><span class="meta-label">⚖️ 重量</span>{{ catchRecord.weight }} 斤</div>
+            <div v-if="catchRecord.bait"><span class="meta-label">🪤 饵料</span>{{ catchRecord.bait }}</div>
+            <div v-if="catchRecord.spotName"><span class="meta-label">📍 钓点</span>{{ catchRecord.spotName }}</div>
+            <div v-if="catchRecord.weather"><span class="meta-label">☀️ 天气</span>{{ catchRecord.weather }}</div>
+            <div v-if="catchRecord.fishingDate"><span class="meta-label">📅 日期</span>{{ catchRecord.fishingDate }}</div>
+          </div>
+        </div>
+
+        <!-- 装备测评信息卡 -->
+        <div v-if="gearReview" class="meta-card review-card">
+          <div class="meta-grid">
+            <div v-if="gearReview.brand"><span class="meta-label">🏷️ 品牌</span>{{ gearReview.brand }}</div>
+            <div v-if="gearReview.model"><span class="meta-label">📦 型号</span>{{ gearReview.model }}</div>
+            <div v-if="gearReview.gearCategory"><span class="meta-label">📚 分类</span>{{ gearReview.gearCategory }}</div>
+            <div v-if="gearReview.price"><span class="meta-label">💰 价格</span>￥{{ gearReview.price }}</div>
+            <div v-if="gearReview.rating"><span class="meta-label">⭐ 评分</span>{{ '⭐'.repeat(gearReview.rating) }}</div>
+          </div>
+          <div v-if="gearReview.pros" style="margin-top:8px; font-size:13px"><span style="color:#10b981; font-weight:500">✅ 优点：</span>{{ gearReview.pros }}</div>
+          <div v-if="gearReview.cons" style="margin-top:4px; font-size:13px"><span style="color:#ef4444; font-weight:500">❌ 缺点：</span>{{ gearReview.cons }}</div>
+        </div>
+
+        <div class="post-body" v-html="sanitizedContent"></div>
+        <div style="margin-top:16px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px">
+          <el-button size="small" :type="post.liked?'primary':''" @click="toggleLike">👍 {{ post.likeCount }}</el-button>
+          <el-button size="small" :type="post.favorited?'warning':''" @click="toggleFavorite">{{ post.favorited?'⭐ 已收藏':'☆ 收藏' }}</el-button>
+          <el-button size="small" @click="showReport=true">🚩 举报</el-button>
+          <el-button v-if="isOwner" size="small" @click="$router.push(`/post/edit/${post.id}`)">✏️ 编辑</el-button>
+          <el-button v-if="isOwner||isAdmin" size="small" type="danger" @click="deletePost">🗑 删除</el-button>
         </div>
       </div>
-      <h1 style="font-size:20px; margin-bottom:12px">
-        <el-tag v-if="post.postType==='CATCH'" size="small" type="success" style="margin-right:6px">🐟 渔获</el-tag>
-        <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning" style="margin-right:6px">⭐ 测评</el-tag>
-        {{ post.title }}
-      </h1>
 
-      <!-- 渔获信息卡 -->
-      <div v-if="catchRecord" class="meta-card catch-card">
-        <div class="meta-grid">
-          <div v-if="catchRecord.fishSpecies"><span class="meta-label">🐟 鱼种</span>{{ catchRecord.fishSpecies }}</div>
-          <div v-if="catchRecord.weight"><span class="meta-label">⚖️ 重量</span>{{ catchRecord.weight }} 斤</div>
-          <div v-if="catchRecord.bait"><span class="meta-label">🪤 饵料</span>{{ catchRecord.bait }}</div>
-          <div v-if="catchRecord.spotName"><span class="meta-label">📍 钓点</span>{{ catchRecord.spotName }}</div>
-          <div v-if="catchRecord.weather"><span class="meta-label">☀️ 天气</span>{{ catchRecord.weather }}</div>
-          <div v-if="catchRecord.fishingDate"><span class="meta-label">📅 日期</span>{{ catchRecord.fishingDate }}</div>
+      <!-- 评论区 -->
+      <div class="card">
+        <h3 style="font-size:15px; margin-bottom:12px">💬 评论 ({{ post.commentCount }})</h3>
+        <div v-if="userStore.isLoggedIn" style="margin-bottom:16px; display:flex; gap:10px">
+          <img :src="userStore.user?.avatar||'/default-avatar.png'" class="avatar-sm" style="margin-top:4px" />
+          <div style="flex:1">
+            <el-input v-model="commentContent" type="textarea" :rows="2" placeholder="说点什么..." />
+            <el-button type="primary" size="small" style="margin-top:6px" @click="submitComment(null)" :disabled="!commentContent.trim()">发表</el-button>
+          </div>
         </div>
-      </div>
+        <div v-else style="text-align:center; padding:8px; font-size:13px; color:#999"><router-link to="/login">登录</router-link>后参与评论</div>
 
-      <!-- 装备测评信息卡 -->
-      <div v-if="gearReview" class="meta-card review-card">
-        <div class="meta-grid">
-          <div v-if="gearReview.brand"><span class="meta-label">🏷️ 品牌</span>{{ gearReview.brand }}</div>
-          <div v-if="gearReview.model"><span class="meta-label">📦 型号</span>{{ gearReview.model }}</div>
-          <div v-if="gearReview.gearCategory"><span class="meta-label">📚 分类</span>{{ gearReview.gearCategory }}</div>
-          <div v-if="gearReview.price"><span class="meta-label">💰 价格</span>￥{{ gearReview.price }}</div>
-          <div v-if="gearReview.rating"><span class="meta-label">⭐ 评分</span>{{ '⭐'.repeat(gearReview.rating) }}</div>
+        <div v-for="c in comments" :key="c.id" class="comment-item">
+          <div class="card-header" style="margin-bottom:4px">
+            <img :src="c.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
+            <span class="text-link" style="font-size:13px">{{ c.authorName }}</span>
+            <span class="text-muted">{{ formatTime(c.createdAt) }}</span>
+            <span v-if="userStore.isLoggedIn" class="text-muted text-link" style="margin-left:auto" @click="replyTarget=c">回复</span>
+          </div>
+          <p style="font-size:14px; padding-left:40px; margin-bottom:4px">{{ c.content }}</p>
+          <div v-if="replyTarget?.id===c.id" style="display:flex; gap:6px; margin:6px 0 0 40px">
+            <el-input v-model="replyContent" placeholder="回复..." size="small" />
+            <el-button size="small" type="primary" @click="submitComment(c.id)">回复</el-button>
+            <el-button size="small" @click="replyTarget=null">取消</el-button>
+          </div>
+          <div v-if="c.children?.length" style="margin:8px 0 0 40px; padding-left:12px; border-left:2px solid #eee">
+            <div v-for="sc in c.children" :key="sc.id" style="margin-bottom:6px">
+              <div style="display:flex; gap:6px; align-items:center; font-size:12px; color:#999">
+                <img :src="sc.authorAvatar||'/default-avatar.png'" style="width:20px;height:20px;border-radius:50%" />
+                <span class="text-link">{{ sc.authorName }}</span>
+                <span>{{ formatTime(sc.createdAt) }}</span>
+              </div>
+              <p style="font-size:13px; padding-left:26px">{{ sc.content }}</p>
+            </div>
+          </div>
         </div>
-        <div v-if="gearReview.pros" style="margin-top:8px; font-size:13px"><span style="color:#10b981; font-weight:500">✅ 优点：</span>{{ gearReview.pros }}</div>
-        <div v-if="gearReview.cons" style="margin-top:4px; font-size:13px"><span style="color:#ef4444; font-weight:500">❌ 缺点：</span>{{ gearReview.cons }}</div>
-      </div>
-
-      <div class="post-body" v-html="sanitizedContent"></div>
-      <div style="margin-top:16px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px">
-        <el-button size="small" :type="post.liked?'primary':''" @click="toggleLike">👍 {{ post.likeCount }}</el-button>
-        <el-button size="small" :type="post.favorited?'warning':''" @click="toggleFavorite">{{ post.favorited?'⭐ 已收藏':'☆ 收藏' }}</el-button>
-        <el-button size="small" @click="showReport=true">🚩 举报</el-button>
-        <el-button v-if="isOwner" size="small" @click="$router.push(`/post/edit/${post.id}`)">✏️ 编辑</el-button>
-        <el-button v-if="isOwner||isAdmin" size="small" type="danger" @click="deletePost">🗑 删除</el-button>
+        <el-empty v-if="!comments.length" description="暂无评论，来说两句" :image-size="40" />
       </div>
     </div>
 
-    <!-- 评论区 -->
-    <div class="card">
-      <h3 style="font-size:15px; margin-bottom:12px">💬 评论 ({{ post.commentCount }})</h3>
-      <div v-if="userStore.isLoggedIn" style="margin-bottom:16px; display:flex; gap:10px">
-        <img :src="userStore.user?.avatar||'/default-avatar.png'" class="avatar-sm" style="margin-top:4px" />
-        <div style="flex:1">
-          <el-input v-model="commentContent" type="textarea" :rows="2" placeholder="说点什么..." />
-          <el-button type="primary" size="small" style="margin-top:6px" @click="submitComment(null)" :disabled="!commentContent.trim()">发表</el-button>
-        </div>
-      </div>
-      <div v-else style="text-align:center; padding:8px; font-size:13px; color:#999"><router-link to="/login">登录</router-link>后参与评论</div>
-
-      <div v-for="c in comments" :key="c.id" class="comment-item">
-        <div class="card-header" style="margin-bottom:4px">
-          <img :src="c.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
-          <span class="text-link" style="font-size:13px">{{ c.authorName }}</span>
-          <span class="text-muted">{{ formatTime(c.createdAt) }}</span>
-          <span v-if="userStore.isLoggedIn" class="text-muted text-link" style="margin-left:auto" @click="replyTarget=c">回复</span>
-        </div>
-        <p style="font-size:14px; padding-left:40px; margin-bottom:4px">{{ c.content }}</p>
-        <div v-if="replyTarget?.id===c.id" style="display:flex; gap:6px; margin:6px 0 0 40px">
-          <el-input v-model="replyContent" placeholder="回复..." size="small" />
-          <el-button size="small" type="primary" @click="submitComment(c.id)">回复</el-button>
-          <el-button size="small" @click="replyTarget=null">取消</el-button>
-        </div>
-        <div v-if="c.children?.length" style="margin:8px 0 0 40px; padding-left:12px; border-left:2px solid #eee">
-          <div v-for="sc in c.children" :key="sc.id" style="margin-bottom:6px">
-            <div style="display:flex; gap:6px; align-items:center; font-size:12px; color:#999">
-              <img :src="sc.authorAvatar||'/default-avatar.png'" style="width:20px;height:20px;border-radius:50%" />
-              <span class="text-link">{{ sc.authorName }}</span>
-              <span>{{ formatTime(sc.createdAt) }}</span>
-            </div>
-            <p style="font-size:13px; padding-left:26px">{{ sc.content }}</p>
+    <!-- 侧边栏 -->
+    <div class="side-col">
+      <div class="card" style="cursor:pointer" @click="$router.push(`/profile/${post.userId}`)">
+        <div style="display:flex; gap:12px; align-items:center">
+          <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-lg" />
+          <div>
+            <div style="font-weight:600; font-size:15px">{{ post.authorName }}</div>
+            <div class="text-muted" style="margin-top:4px">{{ post.authorBio || '这个人很懒，什么都没写' }}</div>
           </div>
         </div>
       </div>
-      <el-empty v-if="!comments.length" description="暂无评论，来说两句" :image-size="40" />
+      <div class="card">
+        <h3 style="font-size:14px; margin-bottom:10px">📊 帖子数据</h3>
+        <div class="side-stat"><span>👁 浏览</span><b>{{ post.viewCount }}</b></div>
+        <div class="side-stat"><span>👍 点赞</span><b>{{ post.likeCount }}</b></div>
+        <div class="side-stat"><span>💬 评论</span><b>{{ post.commentCount }}</b></div>
+        <div class="side-stat"><span>📋 板块</span><b>{{ post.sectionName }}</b></div>
+        <div class="side-stat" v-if="post.tagName"><span>🏷️ 标签</span><b>#{{ post.tagName }}</b></div>
+      </div>
+      <div class="card" v-if="hotPosts.length">
+        <h3 style="font-size:14px; margin-bottom:10px">🔥 热门帖子</h3>
+        <div v-for="(hp, i) in hotPosts" :key="hp.id" class="side-item" style="cursor:pointer" @click="$router.push(`/post/${hp.id}`)">
+          <span class="hot-rank" :class="'rank-'+(i+1)">{{ i+1 }}</span>
+          <span style="font-size:13px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ hp.title }}</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px; margin-bottom:10px">🔗 快捷入口</h3>
+        <router-link to="/forum" class="quick-link">📋 论坛首页</router-link>
+        <router-link to="/post/create" class="quick-link">📝 发表帖子</router-link>
+        <router-link to="/spots" class="quick-link">📍 钓点推荐</router-link>
+        <router-link to="/wiki" class="quick-link">📖 钓鱼百科</router-link>
+      </div>
     </div>
 
     <el-dialog v-model="showReport" title="举报" width="380px">
@@ -105,7 +143,7 @@ import DOMPurify from 'dompurify'
 
 const route = useRoute(), router = useRouter(), userStore = useUserStore()
 const post = ref(null), comments = ref([]), commentContent = ref(''), replyContent = ref(''), replyTarget = ref(null), showReport = ref(false), reportReason = ref('')
-const catchRecord = ref(null), gearReview = ref(null)
+const catchRecord = ref(null), gearReview = ref(null), hotPosts = ref([])
 const isOwner = computed(() => post.value && userStore.userId === post.value.userId)
 const isAdmin = computed(() => userStore.isAdmin)
 
@@ -122,12 +160,12 @@ const requireLogin = (action) => {
 onMounted(async () => {
   const r = await request.get(`/api/posts/${route.params.id}`)
   if (r.code === 200) {
-    // 新的响应格式: { post, catchRecord, gearReview }
     post.value = r.data.post || r.data
     catchRecord.value = r.data.catchRecord || null
     gearReview.value = r.data.gearReview || null
   }
   const c = await request.get(`/api/comments/${route.params.id}`); if (c.code === 200) comments.value = c.data || []
+  const hp = await request.get('/api/posts/hot', { params: { limit: 8 } }); if (hp.code === 200) hotPosts.value = (hp.data || []).filter(p => p.id !== Number(route.params.id))
 })
 
 const submitComment = async (parentId) => {
@@ -160,6 +198,7 @@ const deletePost = async () => {
 </script>
 
 <style scoped>
+.detail-grid { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; }
 .post-body { line-height: 1.8; font-size: 15px; color: #444; }
 .post-body :deep(img) { max-width: 100%; border-radius: 4px; }
 .comment-item { padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
@@ -168,4 +207,14 @@ const deletePost = async () => {
 .review-card { background: #fffbeb; border: 1px solid #fde68a; }
 .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 16px; }
 .meta-label { font-weight: 500; margin-right: 4px; color: #666; }
+.side-stat { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid #f5f5f5; }
+.side-stat:last-child { border-bottom: none; }
+.side-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+.hot-rank { width: 18px; height: 18px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: #f0f0f0; color: #999; flex-shrink: 0; }
+.rank-1 { background: #ff4d4f; color: #fff; }
+.rank-2 { background: #ff7a45; color: #fff; }
+.rank-3 { background: #ffa940; color: #fff; }
+.quick-link { display: block; padding: 5px 0; font-size: 13px; color: #555; }
+.quick-link:hover { color: #1a73e8; }
+@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .side-col { display: none; } }
 </style>

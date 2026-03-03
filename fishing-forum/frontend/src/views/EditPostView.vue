@@ -53,7 +53,7 @@ onMounted(async () => {
   ])
   if (sRes.code === 200) sections.value = sRes.data || []
   if (pRes.code === 200) {
-    const p = pRes.data
+    const p = pRes.data.post || pRes.data
     form.value = { title: p.title, content: p.content, sectionId: p.sectionId }
     // 提取已有图片
     const imgRegex = /<img[^>]+src="([^"]+)"/g

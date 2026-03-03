@@ -15,48 +15,95 @@
           <p style="font-size:13px; color:#777; margin-bottom:8px">{{ profile.bio || '这个人很懒，什么也没留下' }}</p>
           <div class="profile-stats">
             <div class="stat-item"><div class="stat-num">{{ profile.postCount||0 }}</div><div class="stat-label">帖子</div></div>
-            <div class="stat-item"><div class="stat-num">{{ profile.followerCount||0 }}</div><div class="stat-label">粉丝</div></div>
-            <div class="stat-item"><div class="stat-num">{{ profile.followingCount||0 }}</div><div class="stat-label">关注</div></div>
+            <div class="stat-item" style="cursor:pointer" @click="showFollowDialog('followers')"><div class="stat-num">{{ profile.followerCount||0 }}</div><div class="stat-label">粉丝</div></div>
+            <div class="stat-item" style="cursor:pointer" @click="showFollowDialog('followings')"><div class="stat-num">{{ profile.followingCount||0 }}</div><div class="stat-label">关注</div></div>
           </div>
         </div>
-        <div v-if="!isOwn && userStore.isLoggedIn" style="align-self:flex-start">
+        <div v-if="!isOwn && userStore.isLoggedIn" style="align-self:flex-start; display:flex; gap:8px">
           <el-button :type="isFollowing?'':'primary'" size="small" @click="toggleFollow">{{ isFollowing?'已关注':'+ 关注' }}</el-button>
-          <el-button size="small" @click="$router.push('/messages')">私信</el-button>
+          <el-button size="small" @click="startChat">✉️ 私信</el-button>
         </div>
       </div>
     </div>
 
-    <!-- 编辑资料 -->
-    <div v-if="isOwn" class="card">
-      <h3 style="font-size:14px; margin-bottom:10px">✏️ 编辑资料</h3>
-      <el-form :model="editForm" label-width="60px" size="small" style="max-width:420px">
-        <el-form-item label="简介"><el-input v-model="editForm.bio" placeholder="一句话介绍自己" /></el-form-item>
-        <el-form-item label="邮箱"><el-input v-model="editForm.email" /></el-form-item>
-        <el-form-item><el-button type="primary" @click="saveProfile">保存修改</el-button></el-form-item>
-      </el-form>
-      <hr class="section-divider" />
-      <h3 style="font-size:14px; margin-bottom:10px">🔒 修改密码</h3>
-      <el-form :model="pwForm" label-width="80px" size="small" style="max-width:420px">
-        <el-form-item label="原密码"><el-input v-model="pwForm.oldPassword" type="password" show-password /></el-form-item>
-        <el-form-item label="新密码"><el-input v-model="pwForm.newPassword" type="password" show-password /></el-form-item>
-        <el-form-item><el-button type="primary" @click="changePassword">修改密码</el-button></el-form-item>
-      </el-form>
+    <!-- Tab 切换 -->
+    <div class="tab-bar">
+      <div :class="['tab-item', {active: activeTab==='posts'}]" @click="activeTab='posts'">📝 {{ isOwn ? '我的帖子' : 'TA的帖子' }}</div>
+      <div v-if="isOwn" :class="['tab-item', {active: activeTab==='favorites'}]" @click="activeTab='favorites'; loadFavorites()">⭐ 我的收藏</div>
+      <div v-if="isOwn" :class="['tab-item', {active: activeTab==='edit'}]" @click="activeTab='edit'">✏️ 编辑资料</div>
     </div>
 
-    <!-- 帖子 -->
-    <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0 8px">
-      <h3 style="font-size:15px">📝 {{ isOwn ? '我的帖子' : 'TA的帖子' }}</h3>
-    </div>
-    <div v-for="p in userPosts" :key="p.id" class="card" style="cursor:pointer" @click="$router.push(`/post/${p.id}`)">
-      <div style="font-size:15px; font-weight:500; margin-bottom:4px">{{ p.title }}</div>
-      <div class="post-meta">
-        <span>{{ new Date(p.createdAt).toLocaleDateString('zh-CN') }}</span>
-        <span>👁 {{ p.viewCount }}</span>
-        <span>💬 {{ p.commentCount }}</span>
-        <span>👍 {{ p.likeCount }}</span>
+    <!-- 帖子列表 -->
+    <template v-if="activeTab==='posts'">
+      <div v-for="p in userPosts" :key="p.id" class="card" style="cursor:pointer" @click="$router.push(`/post/${p.id}`)">
+        <div style="font-size:15px; font-weight:500; margin-bottom:4px">{{ p.title }}</div>
+        <div class="post-meta">
+          <span>{{ new Date(p.createdAt).toLocaleDateString('zh-CN') }}</span>
+          <span>👁 {{ p.viewCount }}</span>
+          <span>💬 {{ p.commentCount }}</span>
+          <span>👍 {{ p.likeCount }}</span>
+        </div>
       </div>
-    </div>
-    <el-empty v-if="!userPosts.length" description="暂无帖子" :image-size="40" />
+      <el-empty v-if="!userPosts.length" description="暂无帖子" :image-size="40" />
+    </template>
+
+    <!-- 收藏列表 -->
+    <template v-if="activeTab==='favorites'">
+      <div v-for="f in favorites" :key="f.id" class="card" style="cursor:pointer" @click="$router.push(`/post/${f.postId || f.id}`)">
+        <div style="font-size:15px; font-weight:500; margin-bottom:4px">{{ f.postTitle || f.title }}</div>
+        <div class="post-meta">
+          <span>收藏于 {{ new Date(f.createdAt).toLocaleDateString('zh-CN') }}</span>
+          <span v-if="f.authorName">by {{ f.authorName }}</span>
+        </div>
+      </div>
+      <el-empty v-if="!favorites.length" description="暂无收藏" :image-size="40" />
+    </template>
+
+    <!-- 编辑资料 -->
+    <template v-if="activeTab==='edit'">
+      <div class="card">
+        <h3 style="font-size:14px; margin-bottom:10px">✏️ 编辑资料</h3>
+        <el-form :model="editForm" label-width="60px" size="small" style="max-width:420px">
+          <el-form-item label="简介"><el-input v-model="editForm.bio" placeholder="一句话介绍自己" /></el-form-item>
+          <el-form-item label="邮箱"><el-input v-model="editForm.email" /></el-form-item>
+          <el-form-item><el-button type="primary" @click="saveProfile">保存修改</el-button></el-form-item>
+        </el-form>
+        <hr class="section-divider" />
+        <h3 style="font-size:14px; margin-bottom:10px">🔒 修改密码</h3>
+        <el-form :model="pwForm" label-width="80px" size="small" style="max-width:420px">
+          <el-form-item label="原密码"><el-input v-model="pwForm.oldPassword" type="password" show-password /></el-form-item>
+          <el-form-item label="新密码"><el-input v-model="pwForm.newPassword" type="password" show-password /></el-form-item>
+          <el-form-item><el-button type="primary" @click="changePassword">修改密码</el-button></el-form-item>
+        </el-form>
+      </div>
+    </template>
+
+    <!-- 关注/粉丝弹窗 -->
+    <el-dialog v-model="followDialogVisible" :title="followDialogType==='followers'?'粉丝列表':'关注列表'" width="400px">
+      <div v-for="u in followList" :key="u.id" style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f5f5f5; cursor:pointer" @click="followDialogVisible=false; $router.push(`/profile/${u.id}`)">
+        <img :src="u.avatar || '/default-avatar.png'" class="avatar-sm" />
+        <div style="flex:1">
+          <div style="font-weight:500; font-size:14px">{{ u.username }}</div>
+          <div class="text-muted">{{ u.bio || '' }}</div>
+        </div>
+      </div>
+      <el-empty v-if="!followList.length" :description="followDialogType==='followers'?'暂无粉丝':'暂无关注'" :image-size="30" />
+    </el-dialog>
+
+    <!-- 私信弹窗 -->
+    <el-dialog v-model="chatDialogVisible" :title="`私信 ${profile.username}`" width="450px">
+      <div ref="chatRef" style="max-height:300px; overflow-y:auto; padding:8px 0; display:flex; flex-direction:column; gap:8px">
+        <div v-for="m in chatMessages" :key="m.id" :style="{alignSelf:m.senderId===userStore.userId?'flex-end':'flex-start',maxWidth:'70%'}">
+          <div :style="{padding:'6px 10px',borderRadius:'6px',fontSize:'14px',background:m.senderId===userStore.userId?'#e8f0fe':'#f5f5f5'}">{{ m.content }}</div>
+          <div style="font-size:11px; color:#ccc; margin-top:2px">{{ new Date(m.createdAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) }}</div>
+        </div>
+        <el-empty v-if="!chatMessages.length" description="暂无消息，打个招呼吧" :image-size="24" />
+      </div>
+      <div style="display:flex; gap:6px; margin-top:12px">
+        <el-input v-model="chatInput" placeholder="输入消息..." @keyup.enter="sendChat" />
+        <el-button type="primary" @click="sendChat" :disabled="!chatInput.trim()">发送</el-button>
+      </div>
+    </el-dialog>
   </div>
   <div v-else class="card" style="text-align:center; padding:40px">
     <p style="font-size:15px; color:#666; margin-bottom:12px">请先登录查看个人中心</p>
@@ -65,26 +112,37 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 import request from '../api/request'
 
-const route = useRoute(), userStore = useUserStore()
-const profile = ref(null), userPosts = ref([]), isFollowing = ref(false)
+const route = useRoute(), router = useRouter(), userStore = useUserStore()
+const profile = ref(null), userPosts = ref([]), favorites = ref([]), isFollowing = ref(false)
 const editForm = ref({ bio: '', email: '' })
 const pwForm = ref({ oldPassword: '', newPassword: '' })
 const fileInput = ref(null)
+const activeTab = ref('posts')
+const followDialogVisible = ref(false), followDialogType = ref('followers'), followList = ref([])
+const chatDialogVisible = ref(false), chatMessages = ref([]), chatInput = ref(''), chatRef = ref(null)
+
 const isOwn = computed(() => { const id = route.params.id ? Number(route.params.id) : userStore.userId; return id === userStore.userId })
 
 const load = async () => {
   const id = route.params.id || userStore.userId
   if (!id) { profile.value = null; return }
+  activeTab.value = 'posts'
   const r = await request.get(`/api/users/${id}/profile`); if (r.code === 200) { profile.value = r.data; editForm.value = { bio: r.data.bio || '', email: r.data.email || '' } }
   const p = await request.get(`/api/users/${id}/posts`, { params: { page: 1, size: 20 } }); if (p.code === 200) userPosts.value = p.data.records || p.data || []
   if (!isOwn.value && userStore.isLoggedIn) { try { const f = await request.get(`/api/follows/check/${id}`); if (f.code === 200) isFollowing.value = f.data } catch (e) { } }
 }
+
+const loadFavorites = async () => {
+  const r = await request.get('/api/favorites')
+  if (r.code === 200) favorites.value = r.data || []
+}
+
 const triggerUpload = () => fileInput.value?.click()
 const uploadAvatar = async (e) => {
   const file = e.target.files[0]; if (!file) return
@@ -97,7 +155,43 @@ const uploadAvatar = async (e) => {
   } catch (err) { ElMessage.error('上传失败: ' + (err.response?.data?.message || err.message)) }
   e.target.value = ''
 }
-const toggleFollow = async () => { const r = await request.post(`/api/follows/${profile.value.id}`); if (r.code === 200) { isFollowing.value = !isFollowing.value; ElMessage.success(r.message) } }
+
+const toggleFollow = async () => {
+  const r = await request.post(`/api/follows/${profile.value.id}`)
+  if (r.code === 200) {
+    isFollowing.value = !isFollowing.value
+    profile.value.followerCount += isFollowing.value ? 1 : -1
+    ElMessage.success(r.message)
+  }
+}
+
+const showFollowDialog = async (type) => {
+  followDialogType.value = type
+  followDialogVisible.value = true
+  const id = route.params.id || userStore.userId
+  const url = type === 'followers' ? `/api/users/${id}/followers` : `/api/users/${id}/followings`
+  const r = await request.get(url)
+  if (r.code === 200) followList.value = r.data || []
+}
+
+const startChat = async () => {
+  chatDialogVisible.value = true
+  chatInput.value = ''
+  const r = await request.get(`/api/messages/${profile.value.id}`, { params: { page: 1, size: 50 } })
+  if (r.code === 200) {
+    chatMessages.value = (r.data.records || r.data || []).reverse()
+    await nextTick()
+    if (chatRef.value) chatRef.value.scrollTop = chatRef.value.scrollHeight
+  }
+}
+
+const sendChat = async () => {
+  if (!chatInput.value.trim()) return
+  await request.post('/api/messages', { receiverId: profile.value.id, content: chatInput.value })
+  chatInput.value = ''
+  startChat()
+}
+
 const saveProfile = async () => { const r = await request.put('/api/users/me', editForm.value); if (r.code === 200) { ElMessage.success('已保存'); userStore.fetchCurrentUser() } }
 const changePassword = async () => {
   if (!pwForm.value.oldPassword || !pwForm.value.newPassword) return ElMessage.warning('请填写密码')
@@ -122,4 +216,8 @@ watch(() => route.params.id, load)
 .stat-num { font-size: 18px; font-weight: 700; color: #1a73e8; }
 .stat-label { font-size: 11px; color: #999; }
 .post-meta { font-size: 12px; color: #999; display: flex; gap: 12px; }
+.tab-bar { display: flex; gap: 0; margin: 16px 0 12px; border-bottom: 2px solid #eee; }
+.tab-item { padding: 8px 16px; font-size: 14px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+.tab-item:hover { color: #1a73e8; }
+.tab-item.active { color: #1a73e8; border-bottom-color: #1a73e8; font-weight: 500; }
 </style>

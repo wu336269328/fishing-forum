@@ -10,53 +10,61 @@
     <div v-if="errorMsg" class="card" style="color:#e74c3c">{{ errorMsg }}</div>
 
     <template v-if="w">
-      <!-- 实时天气 -->
-      <div class="card">
-        <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:center">
-          <div>
-            <div style="font-size:48px; font-weight:700; color:#1a73e8">{{ w.temperature }}°C</div>
-            <div style="font-size:16px; margin-top:4px">{{ w.weather }}</div>
-            <div class="text-muted" style="margin-top:2px">{{ w.province }} · {{ w.city }}</div>
+      <!-- 天气概况 2列布局 -->
+      <div class="weather-top-grid">
+        <!-- 实时天气 -->
+        <div class="card">
+          <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:center">
+            <div>
+              <div style="font-size:48px; font-weight:700; color:#1a73e8">{{ w.temperature }}°C</div>
+              <div style="font-size:16px; margin-top:4px">{{ w.weather }}</div>
+              <div class="text-muted" style="margin-top:2px">{{ w.province }} · {{ w.city }}</div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; font-size:14px; color:#555">
+              <span>💧 湿度: {{ w.humidity }}%</span>
+              <span>🌬️ {{ w.wind_direction }} {{ w.wind_power }}</span>
+              <span v-if="w.feels_like!=null">🌡️ 体感: {{ w.feels_like }}°C</span>
+              <span v-if="w.pressure">📊 气压: {{ w.pressure }} hPa</span>
+              <span v-if="w.visibility">👁 能见度: {{ w.visibility }} km</span>
+              <span v-if="w.uv!=null">☀️ 紫外线: {{ w.uv }}</span>
+              <span v-if="w.cloud!=null">☁️ 云量: {{ w.cloud }}%</span>
+              <span v-if="w.precipitation!=null">🌧️ 降水: {{ w.precipitation }} mm</span>
+            </div>
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; font-size:14px; color:#555">
-            <span>💧 湿度: {{ w.humidity }}%</span>
-            <span>🌬️ {{ w.wind_direction }} {{ w.wind_power }}</span>
-            <span v-if="w.feels_like!=null">🌡️ 体感: {{ w.feels_like }}°C</span>
-            <span v-if="w.pressure">📊 气压: {{ w.pressure }} hPa</span>
-            <span v-if="w.visibility">👁 能见度: {{ w.visibility }} km</span>
-            <span v-if="w.uv!=null">☀️ 紫外线: {{ w.uv }}</span>
-            <span v-if="w.cloud!=null">☁️ 云量: {{ w.cloud }}%</span>
-            <span v-if="w.precipitation!=null">🌧️ 降水: {{ w.precipitation }} mm</span>
+        </div>
+
+        <!-- 空气质量 + 钓鱼指数 -->
+        <div>
+          <div v-if="w.aqi!=null" class="card">
+            <h3 style="font-size:14px; margin-bottom:8px">🌬️ 空气质量</h3>
+            <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap">
+              <div style="text-align:center">
+                <div :style="{fontSize:'28px',fontWeight:'700',color:aqiColor}">{{ w.aqi }}</div>
+                <div style="font-size:13px; color:#777">{{ w.aqi_category }}</div>
+              </div>
+              <div>
+                <div v-if="w.aqi_primary" class="text-muted">主要污染物: {{ w.aqi_primary }}</div>
+                <div v-if="w.air_pollutants" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px 12px; font-size:12px; color:#777; margin-top:4px">
+                  <span v-if="w.air_pollutants.pm25">PM2.5: {{ w.air_pollutants.pm25 }}</span>
+                  <span v-if="w.air_pollutants.pm10">PM10: {{ w.air_pollutants.pm10 }}</span>
+                  <span v-if="w.air_pollutants.o3">O₃: {{ w.air_pollutants.o3 }}</span>
+                  <span v-if="w.air_pollutants.no2">NO₂: {{ w.air_pollutants.no2 }}</span>
+                  <span v-if="w.air_pollutants.so2">SO₂: {{ w.air_pollutants.so2 }}</span>
+                  <span v-if="w.air_pollutants.co">CO: {{ w.air_pollutants.co }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 钓鱼指数 -->
+          <div v-if="fishIndex" class="card" style="background:#f0f9ff; border-color:#bae6fd">
+            <h3 style="font-size:14px; margin-bottom:6px">🎣 钓鱼指数</h3>
+            <div style="font-size:16px; font-weight:600; color:#1a73e8">{{ fishIndex.level }} — {{ fishIndex.brief }}</div>
+            <p style="font-size:13px; color:#555; margin-top:4px">{{ fishIndex.advice }}</p>
           </div>
         </div>
       </div>
 
-      <!-- 空气质量 -->
-      <div v-if="w.aqi!=null" class="card">
-        <h3 style="font-size:14px; margin-bottom:8px">🌬️ 空气质量</h3>
-        <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap">
-          <div style="text-align:center">
-            <div :style="{fontSize:'28px',fontWeight:'700',color:aqiColor}">{{ w.aqi }}</div>
-            <div style="font-size:13px; color:#777">{{ w.aqi_category }}</div>
-          </div>
-          <div v-if="w.aqi_primary" class="text-muted">主要污染物: {{ w.aqi_primary }}</div>
-          <div v-if="w.air_pollutants" style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:#777">
-            <span v-if="w.air_pollutants.pm25">PM2.5: {{ w.air_pollutants.pm25 }}</span>
-            <span v-if="w.air_pollutants.pm10">PM10: {{ w.air_pollutants.pm10 }}</span>
-            <span v-if="w.air_pollutants.o3">O₃: {{ w.air_pollutants.o3 }}</span>
-            <span v-if="w.air_pollutants.no2">NO₂: {{ w.air_pollutants.no2 }}</span>
-            <span v-if="w.air_pollutants.so2">SO₂: {{ w.air_pollutants.so2 }}</span>
-            <span v-if="w.air_pollutants.co">CO: {{ w.air_pollutants.co }}</span>
-          </div>
-        </div>
-      </div>
 
-      <!-- 钓鱼指数 -->
-      <div v-if="fishIndex" class="card" style="background:#f0f9ff; border-color:#bae6fd">
-        <h3 style="font-size:14px; margin-bottom:6px">🎣 钓鱼指数</h3>
-        <div style="font-size:16px; font-weight:600; color:#1a73e8">{{ fishIndex.level }} — {{ fishIndex.brief }}</div>
-        <p style="font-size:13px; color:#555; margin-top:4px">{{ fishIndex.advice }}</p>
-      </div>
 
       <!-- 多天预报 -->
       <div v-if="w.forecast?.length" class="card">
@@ -128,8 +136,10 @@ onMounted(load)
 </script>
 
 <style scoped>
+.weather-top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .forecast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
 .forecast-day { text-align: center; padding: 10px 6px; background: #f9f9f9; border-radius: 6px; }
-.indices-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.indices-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 .index-item { padding: 8px 10px; background: #f9f9f9; border-radius: 6px; }
+@media (max-width: 900px) { .weather-top-grid { grid-template-columns: 1fr; } }
 </style>

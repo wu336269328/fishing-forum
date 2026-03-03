@@ -137,7 +137,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; }
+.home-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
 .post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .post-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #222; }

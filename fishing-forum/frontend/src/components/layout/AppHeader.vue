@@ -66,7 +66,7 @@ onMounted(async () => {
 
 <style scoped>
 .header { background: #fff; border-bottom: 1px solid #e0e0e0; position: sticky; top: 0; z-index: 100; }
-.header-inner { max-width: 1000px; margin: 0 auto; padding: 0 16px; height: 52px; display: flex; align-items: center; gap: 20px; }
+.header-inner { max-width: 1440px; margin: 0 auto; padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 20px; }
 .logo { font-weight: 700; font-size: 16px; color: #111; text-decoration: none; flex-shrink: 0; }
 .nav { display: flex; gap: 16px; flex: 1; }
 .nav a { color: #555; font-size: 14px; text-decoration: none; padding: 4px 0; }
