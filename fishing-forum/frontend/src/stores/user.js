@@ -6,9 +6,19 @@ import request from '../api/request'
  * 用户状态管理
  */
 export const useUserStore = defineStore('user', () => {
+    const readSavedUser = () => {
+        try {
+            return JSON.parse(localStorage.getItem('user') || 'null')
+        } catch (e) {
+            localStorage.removeItem('user')
+            localStorage.removeItem('token')
+            return null
+        }
+    }
+
     // 状态
     const token = ref(localStorage.getItem('token') || '')
-    const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+    const user = ref(readSavedUser())
 
     // 计算属性
     const isLoggedIn = computed(() => !!token.value)

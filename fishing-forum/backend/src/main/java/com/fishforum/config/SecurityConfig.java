@@ -36,6 +36,7 @@ import java.util.Collections;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
 
     // 密码加密器
     @Bean
@@ -64,19 +65,36 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         // 管理员接口（必须在GET公开规则之前！）
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // 私有读取接口（必须在GET公开规则之前）
+                        // 公开浏览接口：新增公开接口必须显式加入白名单，避免误暴露私有 GET API
                         .requestMatchers(HttpMethod.GET,
-                                "/api/users/me",
-                                "/api/messages/**",
-                                "/api/notifications/**",
-                                "/api/favorites",
-                                "/api/follows/check/**").authenticated()
+                                "/api/posts",
+                                "/api/posts/*",
+                                "/api/posts/hot",
+                                "/api/comments/*",
+                                "/api/sections",
+                                "/api/tags",
+                                "/api/tags/hot",
+                                "/api/weather",
+                                "/api/spots",
+                                "/api/spots/all",
+                                "/api/spots/*",
+                                "/api/spots/*/reviews",
+                                "/api/wiki",
+                                "/api/wiki/categories",
+                                "/api/wiki/*",
+                                "/api/wiki/*/history",
+                                "/api/announcements",
+                                "/api/users/*/profile",
+                                "/api/users/*/posts",
+                                "/api/users/*/followings",
+                                "/api/users/*/followers",
+                                "/api/follows/check/**",
+                                "/api/notifications/unread-count").permitAll()
                         // 上传写接口需要登录，已上传文件访问仍通过 /api/uploads/** 公开
                         .requestMatchers("/api/upload/**").authenticated()
-                        // 所有GET请求公开 - 游客可浏览全部内容
-                        .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
                         // 其余POST/PUT/DELETE需要登录（发帖、评论等写操作）
                         .anyRequest().authenticated())
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 // 在密码验证过滤器前添加JWT过滤器
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

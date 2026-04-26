@@ -1,5 +1,5 @@
 <template>
-  <div v-if="post" class="detail-grid">
+  <div v-if="post" class="detail-grid responsive-grid page-shell">
     <!-- 主内容区 -->
     <div class="main-col">
       <div class="card">
@@ -10,7 +10,7 @@
             <div class="text-muted">{{ post.sectionName }} · {{ formatTime(post.createdAt) }} · {{ post.viewCount }} 次浏览</div>
           </div>
         </div>
-        <h1 style="font-size:20px; margin-bottom:12px">
+        <h1 class="detail-title">
           <el-tag v-if="post.postType==='CATCH'" size="small" type="success" style="margin-right:6px">🐟 渔获</el-tag>
           <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning" style="margin-right:6px">⭐ 测评</el-tag>
           {{ post.title }}
@@ -42,7 +42,7 @@
         </div>
 
         <div class="post-body" v-html="sanitizedContent"></div>
-        <div style="margin-top:16px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px">
+        <div class="action-bar">
           <el-button size="small" :type="post.liked?'primary':''" @click="toggleLike">👍 {{ post.likeCount }}</el-button>
           <el-button size="small" :type="post.favorited?'warning':''" @click="toggleFavorite">{{ post.favorited?'⭐ 已收藏':'☆ 收藏' }}</el-button>
           <el-button size="small" @click="showReport=true">🚩 举报</el-button>
@@ -198,9 +198,11 @@ const deletePost = async () => {
 </script>
 
 <style scoped>
-.detail-grid { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; }
+.detail-grid { grid-template-columns: minmax(0, 3fr) 1fr; }
+.detail-title { font-size: clamp(22px, 3vw, 34px); line-height: 1.22; margin-bottom: 14px; color: var(--ink); letter-spacing: -0.03em; }
 .post-body { line-height: 1.8; font-size: 15px; color: #444; }
 .post-body :deep(img) { max-width: 100%; border-radius: 4px; }
+.action-bar { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; }
 .comment-item { padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
 .meta-card { border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-size: 13px; }
 .catch-card { background: #f0fdf4; border: 1px solid #bbf7d0; }
@@ -216,5 +218,5 @@ const deletePost = async () => {
 .rank-3 { background: #ffa940; color: #fff; }
 .quick-link { display: block; padding: 5px 0; font-size: 13px; color: #555; }
 .quick-link:hover { color: #1a73e8; }
-@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .side-col { display: none; } }
+@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .side-col { display: none; } .meta-grid { grid-template-columns: 1fr; } }
 </style>

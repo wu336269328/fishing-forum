@@ -7,9 +7,9 @@ server:
 spring:
   # 数据库配置
   datasource:
-    url: jdbc:postgresql://localhost:5432/fishing_forum
-    username: postgres
-    password: postgres
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/fishing_forum}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   # 文件上传限制
@@ -44,8 +44,8 @@ mybatis-plus:
 
 # JWT配置
 jwt:
-  secret: FishingForumSecretKeyThatShouldBeAtLeast256BitsLongForHS256Algorithm2024
-  expiration: 86400000  # 24小时（毫秒）
+  secret: ${JWT_SECRET:FishingForumLocalDevSecretKeyThatShouldBeChangedBeforeProduction2024}
+  expiration: ${JWT_EXPIRATION:86400000}  # 24小时（毫秒）
 
 # 文件上传路径
 upload:

@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
     avatar VARCHAR(500) DEFAULT '/default-avatar.png',
     bio TEXT DEFAULT '',
     role VARCHAR(20) DEFAULT 'USER',  -- USER / ADMIN
+    is_banned BOOLEAN DEFAULT FALSE,
+    muted_until TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted INTEGER DEFAULT 0
@@ -184,6 +186,29 @@ CREATE TABLE IF NOT EXISTS reports (
     target_type VARCHAR(20) NOT NULL,  -- POST / COMMENT / USER
     reason TEXT NOT NULL,
     status VARCHAR(20) DEFAULT 'PENDING',  -- PENDING / RESOLVED / REJECTED
+    review_note TEXT,
+    handled_by BIGINT REFERENCES users(id),
+    handled_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 管理员操作日志
+CREATE TABLE IF NOT EXISTS admin_logs (
+    id BIGSERIAL PRIMARY KEY,
+    admin_id BIGINT NOT NULL REFERENCES users(id),
+    action VARCHAR(50) NOT NULL,
+    target_type VARCHAR(30),
+    target_id BIGINT,
+    detail TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 敏感词
+CREATE TABLE IF NOT EXISTS sensitive_words (
+    id BIGSERIAL PRIMARY KEY,
+    word VARCHAR(100) NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_by BIGINT REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

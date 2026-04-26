@@ -18,6 +18,8 @@ public class User {
     private String avatar;
     private String bio;
     private String role; // USER / ADMIN
+    private Boolean isBanned;
+    private LocalDateTime mutedUntil;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     @TableLogic

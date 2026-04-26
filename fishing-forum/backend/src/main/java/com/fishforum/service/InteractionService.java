@@ -45,6 +45,10 @@ public class InteractionService {
 
     // 发表评论
     public Result<?> addComment(Long postId, String content, Long parentId, Long userId) {
+        User currentUser = userMapper.selectById(userId);
+        if (currentUser != null && currentUser.getMutedUntil() != null
+                && currentUser.getMutedUntil().isAfter(java.time.LocalDateTime.now()))
+            return Result.error(403, "账号已被禁言，暂不能评论");
         if (content == null || content.trim().isEmpty())
             return Result.error(400, "评论内容不能为空");
         if (content.length() > 2000)

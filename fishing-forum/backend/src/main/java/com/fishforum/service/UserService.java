@@ -56,6 +56,8 @@ public class UserService {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null || !passwordEncoder.matches(password, user.getPassword()))
             return Result.error(400, "用户名或密码错误");
+        if (Boolean.TRUE.equals(user.getIsBanned()))
+            return Result.error(403, "账号已被封禁，请联系管理员");
         // 生成JWT令牌
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
         Map<String, Object> data = new HashMap<>();

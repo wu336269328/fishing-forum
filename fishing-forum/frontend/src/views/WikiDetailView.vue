@@ -1,5 +1,5 @@
 <template>
-  <div v-if="entry" class="detail-grid">
+  <div v-if="entry" class="detail-grid responsive-grid page-shell">
     <!-- 主内容区 -->
     <div class="main-col">
       <div class="card">
@@ -105,13 +105,14 @@ import { useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import request from '../api/request'
 
 const route = useRoute(), userStore = useUserStore()
 const entry = ref(null), histories = ref([]), relatedEntries = ref([])
 const editing = ref(false), saving = ref(false), wikiUploading = ref(false), lastImgUrl = ref('')
 const editForm = ref({ title: '', category: '', content: '' })
-const renderedContent = computed(() => entry.value?.content ? marked(entry.value.content) : '')
+const renderedContent = computed(() => entry.value?.content ? DOMPurify.sanitize(marked(entry.value.content)) : '')
 
 const formatTime = (t) => { if (!t) return ''; const d = new Date(t), now = new Date(), diff = (now - d) / 1000; if (diff < 60) return '刚刚'; if (diff < 3600) return Math.floor(diff / 60) + '分钟前'; if (diff < 86400) return Math.floor(diff / 3600) + '小时前'; return d.toLocaleDateString('zh-CN') }
 
@@ -158,7 +159,7 @@ onMounted(loadEntry)
 </script>
 
 <style scoped>
-.detail-grid { display: grid; grid-template-columns: 4fr 1fr; gap: 16px; }
+.detail-grid { grid-template-columns: minmax(0, 4fr) 1fr; }
 .wiki-content { line-height: 1.8; font-size: 15px; color: #444; }
 .wiki-content :deep(h1), .wiki-content :deep(h2), .wiki-content :deep(h3) { margin: 16px 0 8px; color: #222; }
 .wiki-content :deep(ul), .wiki-content :deep(ol) { padding-left: 20px; }

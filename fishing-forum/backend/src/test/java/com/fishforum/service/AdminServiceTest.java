@@ -28,6 +28,8 @@ class AdminServiceTest {
     @Mock AnnouncementMapper announcementMapper;
     @Mock FishingSpotMapper spotMapper;
     @Mock WikiEntryMapper wikiMapper;
+    @Mock AdminLogMapper adminLogMapper;
+    @Mock SensitiveWordMapper sensitiveWordMapper;
     @InjectMocks AdminService adminService;
 
     @Test
@@ -39,7 +41,8 @@ class AdminServiceTest {
         when(wikiMapper.selectCount(null)).thenReturn(5L);
         when(reportMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(6L);
 
-        Map<?, ?> stats = (Map<?, ?>) adminService.getStatistics().getData();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> stats = (Map<String, Object>) adminService.getStatistics().getData();
 
         assertThat(stats.get("userCount")).isEqualTo(1L);
         assertThat(stats.get("postCount")).isEqualTo(2L);
@@ -47,6 +50,7 @@ class AdminServiceTest {
         assertThat(stats.get("spotCount")).isEqualTo(4L);
         assertThat(stats.get("wikiCount")).isEqualTo(5L);
         assertThat(stats.get("pendingReports")).isEqualTo(6L);
+        assertThat(stats.keySet()).contains("bannedUsers", "mutedUsers", "sensitiveWords");
     }
 
     @Test
@@ -71,11 +75,39 @@ class AdminServiceTest {
         user.setRole("USER");
         when(userMapper.selectById(3L)).thenReturn(user);
 
-        Result<?> result = adminService.changeUserRole(3L, "ADMIN");
+        Result<?> result = adminService.changeUserRole(99L, 3L, "ADMIN");
 
         assertThat(result.getData()).isEqualTo("角色修改成功");
         assertThat(user.getRole()).isEqualTo("ADMIN");
         verify(userMapper).updateById(user);
+        verify(adminLogMapper).insert(argThat(log -> log.getAdminId().equals(99L)
+                && "CHANGE_ROLE".equals(log.getAction())));
+    }
+
+    @Test
+    void changeUserRoleRejectsInvalidRolesAndSelfDemotion() {
+        assertThat(adminService.changeUserRole(99L, 3L, "ROOT").getCode()).isEqualTo(400);
+        assertThat(adminService.changeUserRole(3L, 3L, "USER").getCode()).isEqualTo(400);
+        verify(userMapper, never()).updateById(any(User.class));
+    }
+
+    @Test
+    void banAndMuteUserProtectCurrentAdminAndWriteLogs() {
+        User user = new User();
+        user.setId(8L);
+        when(userMapper.selectById(8L)).thenReturn(user);
+
+        Result<?> banned = adminService.setUserBanned(99L, 8L, true);
+        Result<?> muted = adminService.setUserMuted(99L, 8L, true, 60);
+        Result<?> selfBan = adminService.setUserBanned(99L, 99L, true);
+
+        assertThat(banned.getData()).isEqualTo("用户已封禁");
+        assertThat(muted.getData()).isEqualTo("用户已禁言");
+        assertThat(selfBan.getCode()).isEqualTo(400);
+        assertThat(user.getIsBanned()).isTrue();
+        assertThat(user.getMutedUntil()).isNotNull();
+        verify(userMapper, times(2)).updateById(user);
+        verify(adminLogMapper, times(2)).insert(any(AdminLog.class));
     }
 
     @Test
@@ -83,17 +115,39 @@ class AdminServiceTest {
         Report postReport = report(9L, "POST");
         when(reportMapper.selectById(1L)).thenReturn(postReport);
 
-        Result<?> resolved = adminService.handleReport(1L, "resolve");
+        Result<?> resolved = adminService.handleReport(99L, 1L, "resolve", "违规内容已删除");
 
         assertThat(resolved.getData()).isEqualTo("处理成功");
         assertThat(postReport.getStatus()).isEqualTo("RESOLVED");
+        assertThat(postReport.getReviewNote()).isEqualTo("违规内容已删除");
         verify(postMapper).deleteById(9L);
+        verify(adminLogMapper).insert(argThat(log -> "HANDLE_REPORT".equals(log.getAction())));
 
         Report commentReport = report(10L, "COMMENT");
         when(reportMapper.selectById(2L)).thenReturn(commentReport);
-        adminService.handleReport(2L, "reject");
+        adminService.handleReport(99L, 2L, "reject", "证据不足");
         assertThat(commentReport.getStatus()).isEqualTo("REJECTED");
+        assertThat(commentReport.getReviewNote()).isEqualTo("证据不足");
         verify(commentMapper, never()).deleteById(10L);
+    }
+
+    @Test
+    void sensitiveWordCrudCreatesAndDisablesWordsWithLogs() {
+        SensitiveWord word = new SensitiveWord();
+        word.setId(5L);
+        word.setWord("spam");
+        word.setIsActive(true);
+        when(sensitiveWordMapper.selectById(5L)).thenReturn(word);
+
+        Result<?> created = adminService.createSensitiveWord(99L, "spam");
+        Result<?> disabled = adminService.setSensitiveWordActive(99L, 5L, false);
+
+        assertThat(created.getData()).isEqualTo("敏感词已添加");
+        assertThat(disabled.getData()).isEqualTo("敏感词已停用");
+        assertThat(word.getIsActive()).isFalse();
+        verify(sensitiveWordMapper).insert(argThat(w -> "spam".equals(w.getWord()) && w.getIsActive()));
+        verify(sensitiveWordMapper).updateById(word);
+        verify(adminLogMapper, times(2)).insert(any(AdminLog.class));
     }
 
     @Test

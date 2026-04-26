@@ -17,6 +17,9 @@ public class Report {
     private String targetType; // POST / COMMENT / USER
     private String reason;
     private String status; // PENDING / RESOLVED / REJECTED
+    private String reviewNote;
+    private Long handledBy;
+    private LocalDateTime handledAt;
     private LocalDateTime createdAt;
 
     @TableField(exist = false)

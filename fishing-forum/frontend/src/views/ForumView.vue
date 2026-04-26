@@ -1,17 +1,21 @@
 <template>
-  <div>
-    <h1 class="page-title">论坛</h1>
+  <div class="page-shell">
+    <section class="hero-panel">
+      <p class="eyebrow">Forum</p>
+      <h1 class="hero-title">讨论、渔获、装备测评都在这里。</h1>
+      <p class="hero-subtitle">用板块、标签和排序快速找到对你有用的钓鱼经验。</p>
+    </section>
     <!-- 类型筛选 -->
-    <div class="card" style="display:flex; gap:8px; margin-bottom:0; padding:10px 16px">
+    <div class="card type-bar">
       <el-tag v-for="t in postTypes" :key="t.value" :effect="selectedType===t.value?'dark':'plain'" @click="selectedType=t.value" style="cursor:pointer">{{ t.icon }} {{ t.label }}</el-tag>
     </div>
     <!-- 板块+标签筛选 -->
     <div class="card filter-bar">
       <el-tag v-for="s in [{id:null,name:'全部',icon:''},...sections]" :key="s.id||'all'" :effect="selectedSection===s.id?'dark':'plain'"
               @click="selectedSection=s.id; selectedTag=null" style="cursor:pointer; margin:2px">{{ s.icon||'📋' }} {{ s.name }}</el-tag>
-      <div style="margin-left:auto; display:flex; gap:8px; flex-shrink:0">
-        <el-input v-model="keyword" placeholder="搜索帖子..." clearable size="small" style="width:160px" @keyup.enter="loadPosts" />
-        <el-select v-model="sortBy" size="small" style="width:100px">
+      <div class="filter-actions">
+        <el-input v-model="keyword" placeholder="搜索帖子..." clearable size="small" @keyup.enter="loadPosts" />
+        <el-select v-model="sortBy" size="small">
           <el-option label="最新" value="latest" /><el-option label="最热" value="hot" /><el-option label="点赞" value="likes" />
         </el-select>
       </div>
@@ -24,14 +28,14 @@
               @click="selectedTag=tag.id" style="cursor:pointer; margin:1px">{{ tag.name }}</el-tag>
     </div>
     <!-- 帖子 -->
-    <div v-for="post in posts" :key="post.id" class="card post-item" @click="$router.push(`/post/${post.id}`)">
+    <div v-for="post in posts" :key="post.id" class="card post-item list-card" @click="$router.push(`/post/${post.id}`)">
       <div class="card-header">
         <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
         <div>
           <span class="text-link" @click.stop="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
           <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
         </div>
-        <div style="margin-left:auto; display:flex; gap:4px">
+        <div class="post-tags">
           <el-tag v-if="post.postType==='CATCH'" size="small" type="success">🐟 渔获</el-tag>
           <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning">⭐ 测评</el-tag>
           <el-tag v-if="post.isTop" size="small" type="danger">置顶</el-tag>
@@ -103,10 +107,22 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
+.type-bar { display: flex; gap: 8px; margin-bottom: 0; padding: 10px 16px; overflow-x: auto; }
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.filter-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
+.filter-actions .el-input { width: 180px; }
+.filter-actions .el-select { width: 110px; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
 .post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.post-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #222; }
+.post-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; color: var(--ink); }
 .post-excerpt { font-size: 13px; color: #777; margin-bottom: 8px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .post-meta { font-size: 12px; color: #999; display: flex; gap: 12px; }
+.post-tags { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 768px) {
+  .filter-actions { width: 100%; margin-left: 0; }
+  .filter-actions .el-input, .filter-actions .el-select { width: 100%; }
+  .post-tags { width: 100%; margin-left: 42px; justify-content: flex-start; }
+  .post-meta { flex-wrap: wrap; }
+}
 </style>

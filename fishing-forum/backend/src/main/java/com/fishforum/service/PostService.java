@@ -101,6 +101,10 @@ public class PostService {
 
     // 发帖
     public Result<?> createPost(Post post, Long userId) {
+        User currentUser = userMapper.selectById(userId);
+        if (currentUser != null && currentUser.getMutedUntil() != null
+                && currentUser.getMutedUntil().isAfter(java.time.LocalDateTime.now()))
+            return Result.error(403, "账号已被禁言，暂不能发帖");
         if (post.getTitle() == null || post.getTitle().trim().isEmpty())
             return Result.error(400, "标题不能为空");
         if (post.getTitle().length() > 100)

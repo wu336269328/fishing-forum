@@ -1,5 +1,6 @@
 package com.fishforum.controller;
 
+import com.fishforum.common.FileTypeValidator;
 import com.fishforum.common.Result;
 import com.fishforum.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -70,11 +71,11 @@ public class UserController {
     // 上传头像
     @PostMapping("/api/users/me/avatar")
     public Result<?> uploadAvatar(Authentication auth, @RequestParam("file") MultipartFile file) throws IOException {
-        // 生成唯一文件名
-        String original = file.getOriginalFilename();
-        String ext = (original != null && original.contains(".")) ? original.substring(original.lastIndexOf("."))
-                : ".png";
-        String fileName = UUID.randomUUID() + ext;
+        Result<?> validation = FileTypeValidator.validateImage(file);
+        if (validation.getCode() != 200) {
+            return validation;
+        }
+        String fileName = UUID.randomUUID() + FileTypeValidator.safeImageExtension(file);
         // 使用绝对路径保存
         Path dir = Paths.get(uploadPath, "avatars").toAbsolutePath();
         Files.createDirectories(dir);

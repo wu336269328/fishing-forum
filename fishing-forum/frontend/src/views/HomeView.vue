@@ -1,5 +1,13 @@
 <template>
-  <div>
+  <div class="page-shell">
+    <section class="hero-panel home-hero">
+      <div>
+        <p class="eyebrow">钓友圈 · Fishing Community</p>
+        <h1 class="hero-title">找钓点、聊装备、晒渔获。</h1>
+        <p class="hero-subtitle">把每一次出钓经验沉淀成可搜索、可讨论、可复用的社区内容。</p>
+      </div>
+      <router-link to="/post/create"><el-button size="large" round>发布渔获</el-button></router-link>
+    </section>
     <!-- 公告 -->
     <div v-if="announcements.length" class="card" style="background:#fffbe6; border-color:#ffe58f">
       <div v-for="a in announcements" :key="a.id" style="font-size:13px; padding:2px 0">📢 <b>{{ a.title }}</b> — {{ a.content }}</div>
@@ -13,18 +21,18 @@
       <div class="stat-item"><div class="stat-num">{{ stats.wikiCount || 0 }}</div><div class="stat-label">词条</div></div>
     </div>
 
-    <div class="home-grid">
+    <div class="home-grid responsive-grid">
       <!-- 帖子列表 -->
       <div class="main-col">
         <h2 class="page-title">最新帖子</h2>
-        <div v-for="post in posts" :key="post.id" class="card post-item" @click="$router.push(`/post/${post.id}`)">
+        <div v-for="post in posts" :key="post.id" class="card post-item list-card" @click="$router.push(`/post/${post.id}`)">
           <div class="card-header">
             <img :src="post.authorAvatar || '/default-avatar.png'" class="avatar-sm" />
             <div>
               <span class="text-link" @click.stop="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
               <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
             </div>
-            <div style="margin-left:auto; display:flex; gap:4px">
+            <div class="post-tags">
               <el-tag v-if="post.postType==='CATCH'" size="small" type="success">🐟 渔获</el-tag>
               <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning">⭐ 测评</el-tag>
               <el-tag v-if="post.isTop" size="small" type="danger">置顶</el-tag>
@@ -137,12 +145,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+.home-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
+.home-grid { align-items: start; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
 .post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.post-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #222; }
+.post-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; color: var(--ink); }
 .post-excerpt { font-size: 13px; color: #777; margin-bottom: 8px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .post-meta { font-size: 12px; color: #999; display: flex; gap: 12px; }
+.post-tags { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .side-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
 .side-item a { color: #555; flex: 1; }
 .side-item a:hover { color: #1a73e8; }
@@ -155,5 +166,9 @@ onMounted(async () => {
 .tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag-item { padding: 2px 8px; border-radius: 12px; font-size: 12px; border: 1px solid; text-decoration: none; transition: opacity 0.15s; }
 .tag-item:hover { opacity: 0.7; }
-@media (max-width: 768px) { .home-grid { grid-template-columns: 1fr; } .side-col { display: none; } }
+@media (max-width: 768px) {
+  .home-hero { align-items: flex-start; flex-direction: column; }
+  .post-tags { width: 100%; margin-left: 42px; justify-content: flex-start; }
+  .post-meta { flex-wrap: wrap; gap: 8px; }
+}
 </style>

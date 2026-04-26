@@ -1,7 +1,7 @@
 <template>
-  <div v-if="profile">
+  <div v-if="profile" class="page-shell">
     <!-- 用户信息卡 -->
-    <div class="card profile-card">
+    <div class="card profile-card hero-profile">
       <div class="profile-top">
         <div class="avatar-wrap" @click="isOwn && triggerUpload()">
           <img :src="profile.avatar || '/default-avatar.png'" class="avatar-lg" />
@@ -19,7 +19,7 @@
             <div class="stat-item" style="cursor:pointer" @click="showFollowDialog('followings')"><div class="stat-num">{{ profile.followingCount||0 }}</div><div class="stat-label">关注</div></div>
           </div>
         </div>
-        <div v-if="!isOwn && userStore.isLoggedIn" style="align-self:flex-start; display:flex; gap:8px">
+        <div v-if="!isOwn && userStore.isLoggedIn" class="profile-actions">
           <el-button :type="isFollowing?'':'primary'" size="small" @click="toggleFollow">{{ isFollowing?'已关注':'+ 关注' }}</el-button>
           <el-button size="small" @click="startChat">✉️ 私信</el-button>
         </div>
@@ -35,7 +35,7 @@
 
     <!-- 帖子列表 -->
     <template v-if="activeTab==='posts'">
-      <div v-for="p in userPosts" :key="p.id" class="card" style="cursor:pointer" @click="$router.push(`/post/${p.id}`)">
+      <div v-for="p in userPosts" :key="p.id" class="card list-card" style="cursor:pointer" @click="$router.push(`/post/${p.id}`)">
         <div style="font-size:15px; font-weight:500; margin-bottom:4px">{{ p.title }}</div>
         <div class="post-meta">
           <span>{{ new Date(p.createdAt).toLocaleDateString('zh-CN') }}</span>
@@ -207,11 +207,13 @@ watch(() => route.params.id, load)
 
 <style scoped>
 .profile-top { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.hero-profile { background: linear-gradient(135deg, rgba(255,253,248,.92), rgba(231,243,236,.92)); }
 .avatar-wrap { position: relative; cursor: pointer; flex-shrink: 0; }
 .avatar-overlay { position: absolute; inset: 0; border-radius: 50%; background: rgba(0,0,0,0.4); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
 .avatar-wrap:hover .avatar-overlay { opacity: 1; }
 .profile-info { flex: 1; }
 .profile-stats { display: flex; gap: 20px; }
+.profile-actions { align-self: flex-start; display: flex; gap: 8px; }
 .stat-item { text-align: center; }
 .stat-num { font-size: 18px; font-weight: 700; color: #1a73e8; }
 .stat-label { font-size: 11px; color: #999; }
@@ -220,4 +222,13 @@ watch(() => route.params.id, load)
 .tab-item { padding: 8px 16px; font-size: 14px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
 .tab-item:hover { color: #1a73e8; }
 .tab-item.active { color: #1a73e8; border-bottom-color: #1a73e8; font-weight: 500; }
+@media (max-width: 768px) {
+  .profile-top { align-items: center; }
+  .profile-info { min-width: 100%; }
+  .profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .profile-actions { width: 100%; }
+  .profile-actions .el-button { flex: 1; }
+  .tab-bar { overflow-x: auto; }
+  .tab-item { flex-shrink: 0; }
+}
 </style>

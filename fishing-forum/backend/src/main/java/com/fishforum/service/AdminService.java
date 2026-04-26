@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 /**
  * 后台管理服务 - 用户管理、内容审核、数据统计、公告管理
@@ -26,6 +27,8 @@ public class AdminService {
     private final AnnouncementMapper announcementMapper;
     private final FishingSpotMapper spotMapper;
     private final WikiEntryMapper wikiMapper;
+    private final AdminLogMapper adminLogMapper;
+    private final SensitiveWordMapper sensitiveWordMapper;
 
     // ========== 数据统计 ==========
     public Result<?> getStatistics() {
@@ -37,6 +40,12 @@ public class AdminService {
         stats.put("wikiCount", wikiMapper.selectCount(null));
         stats.put("pendingReports", reportMapper.selectCount(
                 new LambdaQueryWrapper<Report>().eq(Report::getStatus, "PENDING")));
+        stats.put("bannedUsers", userMapper.selectCount(
+                new LambdaQueryWrapper<User>().eq(User::getIsBanned, true)));
+        stats.put("mutedUsers", userMapper.selectCount(
+                new LambdaQueryWrapper<User>().gt(User::getMutedUntil, LocalDateTime.now())));
+        stats.put("sensitiveWords", sensitiveWordMapper.selectCount(
+                new LambdaQueryWrapper<SensitiveWord>().eq(SensitiveWord::getIsActive, true)));
         return Result.ok(stats);
     }
 
@@ -57,19 +66,52 @@ public class AdminService {
     }
 
     // 修改用户角色
-    public Result<?> changeUserRole(Long userId, String role) {
+    public Result<?> changeUserRole(Long adminId, Long userId, String role) {
+        if (!"USER".equals(role) && !"ADMIN".equals(role))
+            return Result.error(400, "角色不合法");
+        if (adminId.equals(userId) && "USER".equals(role))
+            return Result.error(400, "不能降级当前管理员");
         User user = userMapper.selectById(userId);
         if (user == null)
             return Result.error("用户不存在");
         user.setRole(role);
         userMapper.updateById(user);
+        log(adminId, "CHANGE_ROLE", "USER", userId, "role=" + role);
         return Result.ok("角色修改成功");
     }
 
     // 删除用户
-    public Result<?> deleteUser(Long userId) {
+    public Result<?> deleteUser(Long adminId, Long userId) {
+        if (adminId.equals(userId))
+            return Result.error(400, "不能删除当前管理员");
         userMapper.deleteById(userId);
+        log(adminId, "DELETE_USER", "USER", userId, "delete user");
         return Result.ok("用户已删除");
+    }
+
+    public Result<?> setUserBanned(Long adminId, Long userId, boolean banned) {
+        if (adminId.equals(userId))
+            return Result.error(400, "不能封禁当前管理员");
+        User user = userMapper.selectById(userId);
+        if (user == null)
+            return Result.error("用户不存在");
+        user.setIsBanned(banned);
+        userMapper.updateById(user);
+        log(adminId, banned ? "BAN_USER" : "UNBAN_USER", "USER", userId, banned ? "ban user" : "unban user");
+        return Result.ok(banned ? "用户已封禁" : "用户已解封");
+    }
+
+    public Result<?> setUserMuted(Long adminId, Long userId, boolean muted, Integer minutes) {
+        if (adminId.equals(userId))
+            return Result.error(400, "不能禁言当前管理员");
+        User user = userMapper.selectById(userId);
+        if (user == null)
+            return Result.error("用户不存在");
+        user.setMutedUntil(muted ? LocalDateTime.now().plusMinutes(minutes != null && minutes > 0 ? minutes : 60) : null);
+        userMapper.updateById(user);
+        log(adminId, muted ? "MUTE_USER" : "UNMUTE_USER", "USER", userId,
+                muted ? "minutes=" + (minutes != null ? minutes : 60) : "unmute user");
+        return Result.ok(muted ? "用户已禁言" : "用户已解除禁言");
     }
 
     // ========== 内容审核 ==========
@@ -92,7 +134,7 @@ public class AdminService {
     }
 
     // 处理举报
-    public Result<?> handleReport(Long id, String action) {
+    public Result<?> handleReport(Long adminId, Long id, String action, String reviewNote) {
         Report report = reportMapper.selectById(id);
         if (report == null)
             return Result.error("举报不存在");
@@ -106,8 +148,50 @@ public class AdminService {
         } else {
             report.setStatus("REJECTED");
         }
+        report.setReviewNote(reviewNote);
+        report.setHandledBy(adminId);
+        report.setHandledAt(LocalDateTime.now());
         reportMapper.updateById(report);
+        log(adminId, "HANDLE_REPORT", report.getTargetType(), report.getTargetId(),
+                action + (reviewNote != null ? ":" + reviewNote : ""));
         return Result.ok("处理成功");
+    }
+
+    public Result<?> listAdminLogs(int page, int size) {
+        Page<AdminLog> pageObj = new Page<>(page, size);
+        Page<AdminLog> result = adminLogMapper.selectPage(pageObj,
+                new LambdaQueryWrapper<AdminLog>().orderByDesc(AdminLog::getCreatedAt));
+        Map<String, Object> data = new HashMap<>();
+        data.put("records", result.getRecords());
+        data.put("total", result.getTotal());
+        return Result.ok(data);
+    }
+
+    public Result<?> listSensitiveWords() {
+        return Result.ok(sensitiveWordMapper.selectList(
+                new LambdaQueryWrapper<SensitiveWord>().orderByDesc(SensitiveWord::getCreatedAt)));
+    }
+
+    public Result<?> createSensitiveWord(Long adminId, String word) {
+        if (word == null || word.trim().isEmpty())
+            return Result.error(400, "敏感词不能为空");
+        SensitiveWord sensitiveWord = new SensitiveWord();
+        sensitiveWord.setWord(word.trim());
+        sensitiveWord.setIsActive(true);
+        sensitiveWord.setCreatedBy(adminId);
+        sensitiveWordMapper.insert(sensitiveWord);
+        log(adminId, "CREATE_SENSITIVE_WORD", "SENSITIVE_WORD", sensitiveWord.getId(), word.trim());
+        return Result.ok("敏感词已添加");
+    }
+
+    public Result<?> setSensitiveWordActive(Long adminId, Long id, boolean active) {
+        SensitiveWord word = sensitiveWordMapper.selectById(id);
+        if (word == null)
+            return Result.error("敏感词不存在");
+        word.setIsActive(active);
+        sensitiveWordMapper.updateById(word);
+        log(adminId, active ? "ENABLE_SENSITIVE_WORD" : "DISABLE_SENSITIVE_WORD", "SENSITIVE_WORD", id, word.getWord());
+        return Result.ok(active ? "敏感词已启用" : "敏感词已停用");
     }
 
     // ========== 公告管理 ==========
@@ -146,5 +230,15 @@ public class AdminService {
     public Result<?> deleteAnnouncement(Long id) {
         announcementMapper.deleteById(id);
         return Result.ok("删除成功");
+    }
+
+    private void log(Long adminId, String action, String targetType, Long targetId, String detail) {
+        AdminLog log = new AdminLog();
+        log.setAdminId(adminId);
+        log.setAction(action);
+        log.setTargetType(targetType);
+        log.setTargetId(targetId);
+        log.setDetail(detail);
+        adminLogMapper.insert(log);
     }
 }

@@ -28,13 +28,36 @@ class SecurityConfigTest {
 
     @Test
     void publicBrowsingGetEndpointsRemainOpen() throws Exception {
-        mockMvc.perform(get("/api/posts"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("public"));
+        for (String path : new String[] {
+                "/api/posts",
+                "/api/posts/1",
+                "/api/comments/1",
+                "/api/sections",
+                "/api/tags",
+                "/api/tags/hot",
+                "/api/statistics/public",
+                "/api/weather",
+                "/api/spots",
+                "/api/spots/all",
+                "/api/spots/1",
+                "/api/spots/1/reviews",
+                "/api/wiki",
+                "/api/wiki/1",
+                "/api/wiki/categories",
+                "/api/wiki/1/history",
+                "/api/announcements",
+                "/api/users/1/profile",
+                "/api/follows/check/2",
+                "/api/notifications/unread-count"
+        }) {
+            mockMvc.perform(get(path))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("public"));
+        }
     }
 
     @Test
-    void privateGetEndpointsRequireAuthentication() throws Exception {
+    void privateGetEndpointsAndUnknownApiRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/messages"))
@@ -43,7 +66,7 @@ class SecurityConfigTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/favorites"))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/follows/check/2"))
+        mockMvc.perform(get("/api/new-private-report"))
                 .andExpect(status().isForbidden());
     }
 
@@ -80,13 +103,17 @@ class SecurityConfigTest {
 
     @RestController
     public static class TestEndpoints {
-        @GetMapping({"/api/posts", "/api/uploads/images/example.jpg"})
+        @GetMapping({"/api/posts", "/api/posts/1", "/api/comments/1", "/api/sections", "/api/tags",
+                "/api/tags/hot", "/api/statistics/public", "/api/weather", "/api/spots", "/api/spots/all",
+                "/api/spots/1", "/api/spots/1/reviews", "/api/wiki", "/api/wiki/1", "/api/wiki/categories",
+                "/api/wiki/1/history", "/api/announcements", "/api/users/1/profile", "/api/follows/check/2",
+                "/api/notifications/unread-count", "/api/uploads/images/example.jpg"})
         String publicEndpoint() {
             return "public";
         }
 
         @GetMapping({"/api/users/me", "/api/messages", "/api/notifications", "/api/favorites",
-                "/api/follows/check/2", "/api/admin/statistics"})
+                "/api/admin/statistics", "/api/new-private-report"})
         String privateGetEndpoint() {
             return "private";
         }

@@ -1,6 +1,10 @@
 <template>
-  <div>
-    <h1 class="page-title">发帖</h1>
+  <div class="page-shell create-page">
+    <section class="hero-panel">
+      <p class="eyebrow">Create Post</p>
+      <h1 class="hero-title">写下这次出钓的关键经验。</h1>
+      <p class="hero-subtitle">标题说清楚问题，图片补足细节，标签让更多钓友找到它。</p>
+    </section>
     <div class="card">
       <el-form label-position="top">
         <!-- 帖子类型 -->
@@ -28,7 +32,7 @@
         <!-- 渔获日记表单 -->
         <div v-if="form.postType==='CATCH'" class="sub-form">
           <h4 style="font-size:14px; margin-bottom:8px; color:#10b981">🐟 渔获信息</h4>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+          <div class="sub-grid">
             <el-form-item label="鱼种"><el-input v-model="catchForm.fishSpecies" placeholder="如：鲫鱼" /></el-form-item>
             <el-form-item label="重量(斤)"><el-input-number v-model="catchForm.weight" :min="0" :precision="1" style="width:100%" /></el-form-item>
             <el-form-item label="饵料"><el-input v-model="catchForm.bait" placeholder="如：蚯蚓、商品饵" /></el-form-item>
@@ -41,7 +45,7 @@
         <!-- 装备测评表单 -->
         <div v-if="form.postType==='REVIEW'" class="sub-form">
           <h4 style="font-size:14px; margin-bottom:8px; color:#f59e0b">⭐ 装备信息</h4>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+          <div class="sub-grid">
             <el-form-item label="品牌"><el-input v-model="reviewForm.brand" placeholder="如：光威、化氏" /></el-form-item>
             <el-form-item label="型号"><el-input v-model="reviewForm.model" placeholder="如：天流 V4.5米" /></el-form-item>
             <el-form-item label="分类">
@@ -76,7 +80,7 @@
           </div>
           <div v-if="images.length" class="text-muted" style="margin-top:4px">已上传 {{ images.length }} 张图片</div>
         </el-form-item>
-        <div style="display:flex; gap:8px; justify-content:flex-end">
+        <div class="form-actions">
           <el-button @click="$router.back()">取消</el-button>
           <el-button type="primary" @click="handleSubmit" :loading="loading">发布</el-button>
         </div>
@@ -143,11 +147,20 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
+.create-page { max-width: 920px; margin: 0 auto; }
 .sub-form { background: #f9fafb; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #e5e7eb; }
+.sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: 88px; background: rgba(255,253,248,.88); padding-top: 10px; }
 .img-preview { position: relative; width: 80px; height: 80px; border-radius: 6px; overflow: hidden; border: 1px solid #eee; }
 .img-preview img { width: 100%; height: 100%; object-fit: cover; }
 .img-del { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: #fff; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .img-upload-btn { width: 80px; height: 80px; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #999; cursor: pointer; text-align: center; padding: 4px; }
 .img-upload-btn:hover { border-color: #1a73e8; color: #1a73e8; }
 .img-upload-btn.disabled { cursor: not-allowed; opacity: 0.5; }
+@media (max-width: 768px) {
+  .sub-grid { grid-template-columns: 1fr; }
+  .form-actions { justify-content: stretch; }
+  .form-actions .el-button { flex: 1; }
+}
 </style>

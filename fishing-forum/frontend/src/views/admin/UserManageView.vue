@@ -8,8 +8,15 @@
       <el-table-column prop="username" label="用户名" width="120" />
       <el-table-column prop="email" label="邮箱" />
       <el-table-column prop="role" label="角色" width="80"><template #default="{row}"><el-tag :type="row.role==='ADMIN'?'danger':'info'" size="small">{{ row.role }}</el-tag></template></el-table-column>
-      <el-table-column label="操作" width="180"><template #default="{row}">
+      <el-table-column label="状态" width="150"><template #default="{row}">
+        <el-tag v-if="row.isBanned" type="danger" size="small">封禁</el-tag>
+        <el-tag v-if="row.mutedUntil && new Date(row.mutedUntil) > new Date()" type="warning" size="small">禁言</el-tag>
+        <el-tag v-if="!row.isBanned && !(row.mutedUntil && new Date(row.mutedUntil) > new Date())" type="success" size="small">正常</el-tag>
+      </template></el-table-column>
+      <el-table-column label="操作" width="300"><template #default="{row}">
         <el-button text size="small" type="primary" @click="changeRole(row)">{{ row.role==='ADMIN'?'降级':'升级' }}</el-button>
+        <el-button text size="small" :type="row.isBanned?'success':'danger'" @click="toggleBan(row)">{{ row.isBanned?'解封':'封禁' }}</el-button>
+        <el-button text size="small" :type="row.mutedUntil && new Date(row.mutedUntil) > new Date()?'success':'warning'" @click="toggleMute(row)">{{ row.mutedUntil && new Date(row.mutedUntil) > new Date()?'解禁':'禁言' }}</el-button>
         <el-popconfirm title="确定？" @confirm="del(row.id)"><template #reference><el-button text size="small" type="danger">删除</el-button></template></el-popconfirm>
       </template></el-table-column>
     </el-table>
@@ -24,6 +31,8 @@ import request from '../../api/request'
 const users=ref([]),keyword=ref(''),page=ref(1),total=ref(0)
 const load=async()=>{const r=await request.get('/api/admin/users',{params:{page:page.value,size:10,keyword:keyword.value}});if(r.code===200){users.value=r.data.records||[];total.value=r.data.total||0}}
 const changeRole=async(u)=>{await request.put(`/api/admin/users/${u.id}/role`,{role:u.role==='ADMIN'?'USER':'ADMIN'});ElMessage.success('已修改');load()}
+const toggleBan=async(u)=>{await request.put(`/api/admin/users/${u.id}/ban`,{banned:!u.isBanned});ElMessage.success(u.isBanned?'已解封':'已封禁');load()}
+const toggleMute=async(u)=>{const muted=!(u.mutedUntil && new Date(u.mutedUntil)>new Date());await request.put(`/api/admin/users/${u.id}/mute`,{muted,minutes:1440});ElMessage.success(muted?'已禁言':'已解除禁言');load()}
 const del=async(id)=>{await request.delete(`/api/admin/users/${id}`);ElMessage.success('已删除');load()}
 onMounted(load)
 </script>

@@ -3,6 +3,16 @@
     <h1 class="page-title">公告管理</h1>
     <div class="admin-nav"><router-link to="/admin">仪表盘</router-link><router-link to="/admin/users">用户</router-link><router-link to="/admin/audit">审核</router-link><router-link to="/admin/announcements">公告</router-link></div>
     <div class="card" style="padding:8px; margin-bottom:12px"><el-button type="primary" size="small" @click="showCreate=true">+ 发布公告</el-button></div>
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:10px">敏感词维护</h3>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <el-input v-model="word" size="small" placeholder="新增敏感词" style="max-width:220px" />
+        <el-button type="primary" size="small" @click="createWord">添加</el-button>
+      </div>
+      <el-tag v-for="w in words" :key="w.id" :type="w.isActive?'danger':'info'" style="margin:0 6px 6px 0;cursor:pointer" @click="toggleWord(w)">
+        {{ w.word }} · {{ w.isActive?'启用':'停用' }}
+      </el-tag>
+    </div>
     <div v-for="a in announcements" :key="a.id" class="card">
       <div style="display:flex; justify-content:space-between; align-items:center">
         <b>{{ a.title }}</b>
@@ -32,9 +42,11 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '../../api/request'
-const announcements=ref([]),showCreate=ref(false),form=ref({title:'',content:''})
-const load=async()=>{const r=await request.get('/api/admin/announcements');if(r.code===200) announcements.value=r.data||[]}
+const announcements=ref([]),showCreate=ref(false),form=ref({title:'',content:''}),words=ref([]),word=ref('')
+const load=async()=>{const r=await request.get('/api/admin/announcements');if(r.code===200) announcements.value=r.data||[];const w=await request.get('/api/admin/sensitive-words');if(w.code===200) words.value=w.data||[]}
 const create=async()=>{if(!form.value.title||!form.value.content) return ElMessage.warning('请填写');await request.post('/api/admin/announcements',{...form.value,isActive:true});ElMessage.success('已发布');showCreate.value=false;form.value={title:'',content:''};load()}
+const createWord=async()=>{if(!word.value.trim()) return ElMessage.warning('请填写敏感词');await request.post('/api/admin/sensitive-words',{word:word.value});word.value='';ElMessage.success('已添加');load()}
+const toggleWord=async(w)=>{await request.put(`/api/admin/sensitive-words/${w.id}`,{active:!w.isActive});load()}
 const toggle=async(a)=>{await request.put(`/api/admin/announcements/${a.id}`,{isActive:!a.isActive});load()}
 const del=async(id)=>{await request.delete(`/api/admin/announcements/${id}`);ElMessage.success('已删除');load()}
 onMounted(load)
