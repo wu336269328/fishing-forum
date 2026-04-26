@@ -2,21 +2,22 @@
 # 钓友圈 - 一键启动脚本
 # 用法: bash start.sh
 
-SUDO_PASS="wu336269328"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== 1. 启动 PostgreSQL ==="
-echo "$SUDO_PASS" | sudo -S service postgresql start 2>/dev/null
+if ! pg_isready -q 2>/dev/null; then
+    sudo service postgresql start
+fi
 sleep 1
 
 # 检查数据库是否存在，不存在则创建
-DB_EXISTS=$(echo "$SUDO_PASS" | sudo -S -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='fishing_forum'" 2>/dev/null)
+DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='fishing_forum'" 2>/dev/null)
 if [ "$DB_EXISTS" != "1" ]; then
     echo "=== 创建数据库 fishing_forum ==="
-    echo "$SUDO_PASS" | sudo -S -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" 2>/dev/null
-    echo "$SUDO_PASS" | sudo -S -u postgres psql -c "CREATE DATABASE fishing_forum;" 2>/dev/null
-    echo "$SUDO_PASS" | sudo -S -u postgres psql -d fishing_forum < "$DIR/backend/src/main/resources/schema.sql" 2>/dev/null
-    echo "$SUDO_PASS" | sudo -S -u postgres psql -d fishing_forum < "$DIR/backend/src/main/resources/data.sql" 2>/dev/null
+    sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+    sudo -u postgres psql -c "CREATE DATABASE fishing_forum;"
+    sudo -u postgres psql -d fishing_forum < "$DIR/backend/src/main/resources/schema.sql"
+    sudo -u postgres psql -d fishing_forum < "$DIR/backend/src/main/resources/data.sql"
     echo "数据库初始化完成"
 fi
 echo "PostgreSQL 已就绪"

@@ -100,7 +100,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import request from '../api/request'
 
 const city = ref('北京'), w = ref(null), loading = ref(false), queried = ref(false), errorMsg = ref('')
 
@@ -116,14 +116,11 @@ const dayLabel = (i) => ['今天','明天','后天','第4天','第5天','第6天
 const load = async () => {
   loading.value = true; queried.value = true; errorMsg.value = ''
   try {
-    // 直接调用 uapis.cn 天气API（免费，无需注册）
-    const res = await axios.get('https://uapis.cn/api/v1/misc/weather', {
-      params: { city: city.value, extended: true, forecast: true, indices: true, lang: 'zh' }
-    })
-    if (res.data && res.data.city) {
+    const res = await request.get('/api/weather', { params: { city: city.value } })
+    if (res.code === 200 && res.data?.city) {
       w.value = res.data
-    } else if (res.data?.code) {
-      errorMsg.value = res.data.message || '查询失败'
+    } else {
+      errorMsg.value = res.message || '查询失败'
       w.value = null
     }
   } catch (e) {

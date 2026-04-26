@@ -60,11 +60,19 @@ public class SecurityConfig {
                         // 公开接口 - 无需登录
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/uploads/**").permitAll()
-                        .requestMatchers("/api/upload/**").permitAll()
                         .requestMatchers("/api/statistics/public").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         // 管理员接口（必须在GET公开规则之前！）
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // 私有读取接口（必须在GET公开规则之前）
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/users/me",
+                                "/api/messages/**",
+                                "/api/notifications/**",
+                                "/api/favorites",
+                                "/api/follows/check/**").authenticated()
+                        // 上传写接口需要登录，已上传文件访问仍通过 /api/uploads/** 公开
+                        .requestMatchers("/api/upload/**").authenticated()
                         // 所有GET请求公开 - 游客可浏览全部内容
                         .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
                         // 其余POST/PUT/DELETE需要登录（发帖、评论等写操作）

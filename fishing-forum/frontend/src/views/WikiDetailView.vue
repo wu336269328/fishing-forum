@@ -46,26 +46,9 @@
         </el-form>
       </div>
 
-      <!-- 评论区 -->
       <div class="card">
-        <h3 style="font-size:15px; margin-bottom:12px">💬 讨论 ({{ comments.length }})</h3>
-        <div v-if="userStore.isLoggedIn" style="margin-bottom:16px; display:flex; gap:10px">
-          <img :src="userStore.user?.avatar||'/default-avatar.png'" class="avatar-sm" style="margin-top:4px" />
-          <div style="flex:1">
-            <el-input v-model="commentContent" type="textarea" :rows="2" placeholder="对这个词条有疑问或补充？" />
-            <el-button type="primary" size="small" style="margin-top:6px" @click="submitComment" :disabled="!commentContent.trim()">发表</el-button>
-          </div>
-        </div>
-        <div v-else style="text-align:center; padding:8px; font-size:13px; color:#999"><router-link to="/login">登录</router-link>后参与讨论</div>
-        <div v-for="c in comments" :key="c.id" class="comment-item">
-          <div class="card-header" style="margin-bottom:4px">
-            <img :src="c.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
-            <span class="text-link" style="font-size:13px">{{ c.authorName }}</span>
-            <span class="text-muted">{{ formatTime(c.createdAt) }}</span>
-          </div>
-          <p style="font-size:14px; padding-left:40px">{{ c.content }}</p>
-        </div>
-        <el-empty v-if="!comments.length" description="暂无讨论" :image-size="30" />
+        <h3 style="font-size:15px; margin-bottom:8px">💬 词条讨论</h3>
+        <p class="text-muted">百科讨论功能需要独立的数据模型支持，当前页面不再复用帖子评论接口，避免词条 ID 与帖子 ID 冲突导致数据串联。</p>
       </div>
     </div>
 
@@ -118,15 +101,15 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 import request from '../api/request'
 
-const route = useRoute(), router = useRouter(), userStore = useUserStore()
-const entry = ref(null), histories = ref([]), comments = ref([]), relatedEntries = ref([])
-const editing = ref(false), saving = ref(false), commentContent = ref(''), wikiUploading = ref(false), lastImgUrl = ref('')
+const route = useRoute(), userStore = useUserStore()
+const entry = ref(null), histories = ref([]), relatedEntries = ref([])
+const editing = ref(false), saving = ref(false), wikiUploading = ref(false), lastImgUrl = ref('')
 const editForm = ref({ title: '', category: '', content: '' })
 const renderedContent = computed(() => entry.value?.content ? marked(entry.value.content) : '')
 
@@ -160,12 +143,6 @@ const submitEdit = async () => {
   saving.value = false
 }
 
-const submitComment = async () => {
-  if (!commentContent.value.trim()) return
-  await request.post('/api/comments', { postId: entry.value.id, content: commentContent.value })
-  ElMessage.success('评论已发表'); commentContent.value = ''; loadComments()
-}
-
 const loadEntry = async () => {
   const r = await request.get(`/api/wiki/${route.params.id}`); if (r.code === 200) entry.value = r.data
   const h = await request.get(`/api/wiki/${route.params.id}/history`); if (h.code === 200) histories.value = h.data || []
@@ -175,10 +152,9 @@ const loadEntry = async () => {
     if (re.code === 200) relatedEntries.value = (re.data.records || []).filter(e => e.id !== entry.value.id).slice(0, 8)
   }
 }
-const loadComments = async () => { try { const r = await request.get(`/api/comments/${route.params.id}`); if (r.code === 200) comments.value = r.data || [] } catch (e) { comments.value = [] } }
 
-watch(() => route.params.id, () => { loadEntry(); loadComments() })
-onMounted(() => { loadEntry(); loadComments() })
+watch(() => route.params.id, loadEntry)
+onMounted(loadEntry)
 </script>
 
 <style scoped>
