@@ -25,6 +25,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fishing_forum
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-FishingForumLocalDevSecretKeyThatShouldBeChangedBeforeProduction2024}
       SPRING_SQL_INIT_MODE: never
     volumes:
       - ./backend/uploads:/app/uploads
@@ -33,6 +34,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/api/sections >/dev/null 2>&1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   # Vue.js 前端 + Nginx
   frontend:
@@ -40,7 +46,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:

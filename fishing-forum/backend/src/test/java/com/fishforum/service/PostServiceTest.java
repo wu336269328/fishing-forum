@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
+import com.fishforum.vo.PostVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +29,8 @@ class PostServiceTest {
     @Mock TagMapper tagMapper;
     @Mock LikeMapper likeMapper;
     @Mock FavoriteMapper favoriteMapper;
+    @Mock CommentMapper commentMapper;
+    @Mock ReportMapper reportMapper;
     @Mock CatchRecordMapper catchRecordMapper;
     @Mock GearReviewMapper gearReviewMapper;
     @InjectMocks PostService postService;
@@ -40,20 +43,40 @@ class PostServiceTest {
         page.setRecords(List.of(post));
         page.setTotal(1);
         when(postMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
-        when(userMapper.selectById(2L)).thenReturn(user(2L, "author"));
+        when(userMapper.selectBatchIds(anyCollection())).thenReturn(List.of(user(2L, "author")));
         Section section = new Section(); section.setId(4L); section.setName("渔获");
         Tag tag = new Tag(); tag.setId(6L); tag.setName("鲫鱼");
-        when(sectionMapper.selectById(4L)).thenReturn(section);
-        when(tagMapper.selectById(6L)).thenReturn(tag);
+        when(sectionMapper.selectBatchIds(anyCollection())).thenReturn(List.of(section));
+        when(tagMapper.selectBatchIds(anyCollection())).thenReturn(List.of(tag));
 
         Result<?> result = postService.listPosts(1, 10, 4L, "鱼", "hot", "CATCH", 6L);
 
         Map<?, ?> data = (Map<?, ?>) result.getData();
         List<?> records = (List<?>) data.get("records");
-        Post enriched = (Post) records.get(0);
+        PostVO enriched = (PostVO) records.get(0);
         assertThat(enriched.getAuthorName()).isEqualTo("author");
         assertThat(enriched.getSectionName()).isEqualTo("渔获");
         assertThat(enriched.getTagName()).isEqualTo("鲫鱼");
+        verify(userMapper, never()).selectById(anyLong());
+        verify(sectionMapper, never()).selectById(anyLong());
+        verify(tagMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void listPostsDoesNotQueryTagsWhenNoPostsHaveTag() {
+        Post post = post(9L, 2L, 4L);
+        Page<Post> page = new Page<>(1, 10);
+        page.setRecords(List.of(post));
+        page.setTotal(1);
+        when(postMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        when(userMapper.selectBatchIds(anyCollection())).thenReturn(List.of(user(2L, "author")));
+        Section section = new Section(); section.setId(4L); section.setName("渔获");
+        when(sectionMapper.selectBatchIds(anyCollection())).thenReturn(List.of(section));
+
+        Result<?> result = postService.listPosts(1, 10, null, null, "latest", null, null);
+
+        assertThat(result.getCode()).isEqualTo(200);
+        verify(tagMapper, never()).selectBatchIds(anyCollection());
     }
 
     @Test
@@ -71,12 +94,12 @@ class PostServiceTest {
         Result<?> result = postService.getPost(9L, 3L);
 
         Map<?, ?> data = (Map<?, ?>) result.getData();
-        Post returned = (Post) data.get("post");
+        PostVO returned = (PostVO) data.get("post");
         assertThat(returned.getViewCount()).isEqualTo(11);
         assertThat(returned.getLiked()).isTrue();
         assertThat(returned.getFavorited()).isTrue();
         assertThat(((CatchRecord) data.get("catchRecord")).getFishSpecies()).isEqualTo("鲫鱼");
-        verify(postMapper).updateById(post);
+        verify(postMapper).incrementViewCount(9L);
     }
 
     @Test
@@ -85,20 +108,14 @@ class PostServiceTest {
         post.setTitle(" 新帖 ");
         post.setContent("内容");
         post.setSectionId(4L);
-        Section section = new Section();
-        section.setId(4L);
-        section.setPostCount(2);
-        when(sectionMapper.selectById(4L)).thenReturn(section);
-
         Result<?> result = postService.createPost(post, 8L);
 
         assertThat(result.getCode()).isEqualTo(200);
         assertThat(post.getTitle()).isEqualTo("新帖");
         assertThat(post.getUserId()).isEqualTo(8L);
         assertThat(post.getPostType()).isEqualTo("NORMAL");
-        assertThat(section.getPostCount()).isEqualTo(3);
         verify(postMapper).insert(post);
-        verify(sectionMapper).updateById(section);
+        verify(sectionMapper).incrementPostCount(4L, 1);
     }
 
     @Test
@@ -112,6 +129,24 @@ class PostServiceTest {
         assertThat(update.getCode()).isEqualTo(403);
         assertThat(delete.getCode()).isEqualTo(403);
         verify(postMapper, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deletePostCleansRelationsAndDecrementsSectionCount() {
+        Post existing = post(9L, 2L, 4L);
+        when(postMapper.selectById(9L)).thenReturn(existing);
+
+        Result<?> result = postService.deletePost(9L, 2L, "USER");
+
+        assertThat(result.getCode()).isEqualTo(200);
+        verify(likeMapper).deleteByTarget("POST", 9L);
+        verify(favoriteMapper).deleteByPostId(9L);
+        verify(commentMapper).deleteByPostId(9L);
+        verify(reportMapper).deleteByTarget("POST", 9L);
+        verify(catchRecordMapper).deleteByPostId(9L);
+        verify(gearReviewMapper).deleteByPostId(9L);
+        verify(postMapper).deleteById(9L);
+        verify(sectionMapper).incrementPostCount(4L, -1);
     }
 
     @Test

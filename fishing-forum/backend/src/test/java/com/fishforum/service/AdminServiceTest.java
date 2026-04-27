@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
+import com.fishforum.vo.UserVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +26,11 @@ class AdminServiceTest {
     @Mock PostMapper postMapper;
     @Mock CommentMapper commentMapper;
     @Mock ReportMapper reportMapper;
+    @Mock LikeMapper likeMapper;
+    @Mock FavoriteMapper favoriteMapper;
+    @Mock CatchRecordMapper catchRecordMapper;
+    @Mock GearReviewMapper gearReviewMapper;
+    @Mock SectionMapper sectionMapper;
     @Mock AnnouncementMapper announcementMapper;
     @Mock FishingSpotMapper spotMapper;
     @Mock WikiEntryMapper wikiMapper;
@@ -56,6 +62,7 @@ class AdminServiceTest {
     @Test
     void listUsersSanitizesPasswords() {
         User user = new User();
+        user.setUsername("user");
         user.setPassword("secret");
         Page<User> page = new Page<>(1, 10);
         page.setRecords(List.of(user));
@@ -64,8 +71,8 @@ class AdminServiceTest {
 
         Result<?> result = adminService.listUsers(1, 10, "fish");
 
-        User returned = (User) ((List<?>) ((Map<?, ?>) result.getData()).get("records")).get(0);
-        assertThat(returned.getPassword()).isNull();
+        UserVO returned = (UserVO) ((List<?>) ((Map<?, ?>) result.getData()).get("records")).get(0);
+        assertThat(returned.getUsername()).isEqualTo("user");
     }
 
     @Test
@@ -120,6 +127,12 @@ class AdminServiceTest {
         assertThat(resolved.getData()).isEqualTo("处理成功");
         assertThat(postReport.getStatus()).isEqualTo("RESOLVED");
         assertThat(postReport.getReviewNote()).isEqualTo("违规内容已删除");
+        verify(likeMapper).deleteByTarget("POST", 9L);
+        verify(favoriteMapper).deleteByPostId(9L);
+        verify(commentMapper).deleteByPostId(9L);
+        verify(reportMapper).deleteByTarget("POST", 9L);
+        verify(catchRecordMapper).deleteByPostId(9L);
+        verify(gearReviewMapper).deleteByPostId(9L);
         verify(postMapper).deleteById(9L);
         verify(adminLogMapper).insert(argThat(log -> "HANDLE_REPORT".equals(log.getAction())));
 

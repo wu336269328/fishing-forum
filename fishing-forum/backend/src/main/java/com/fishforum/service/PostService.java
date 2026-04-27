@@ -5,12 +5,18 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
+import com.fishforum.vo.PostVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 帖子服务 - 帖子CRUD、搜索、板块管理
@@ -25,6 +31,8 @@ public class PostService {
     private final TagMapper tagMapper;
     private final LikeMapper likeMapper;
     private final FavoriteMapper favoriteMapper;
+    private final CommentMapper commentMapper;
+    private final ReportMapper reportMapper;
     private final CatchRecordMapper catchRecordMapper;
     private final GearReviewMapper gearReviewMapper;
 
@@ -58,11 +66,10 @@ public class PostService {
         }
 
         Page<Post> result = postMapper.selectPage(pageObj, wrapper);
-        // 填充作者信息
-        result.getRecords().forEach(this::enrichPost);
+        List<PostVO> records = enrichPosts(result.getRecords());
 
         Map<String, Object> data = new HashMap<>();
-        data.put("records", result.getRecords());
+        data.put("records", records);
         data.put("total", result.getTotal());
         data.put("pages", result.getPages());
         return Result.ok(data);
@@ -73,20 +80,19 @@ public class PostService {
         Post post = postMapper.selectById(id);
         if (post == null)
             return Result.error(404, "帖子不存在");
-        // 增加浏览量
-        post.setViewCount(post.getViewCount() + 1);
-        postMapper.updateById(post);
-        enrichPost(post);
+        postMapper.incrementViewCount(id);
+        post.setViewCount((post.getViewCount() == null ? 0 : post.getViewCount()) + 1);
+        PostVO postVO = enrichPosts(List.of(post)).get(0);
         // 检查当前用户是否点赞/收藏
         if (currentUserId != null) {
-            post.setLiked(likeMapper.selectCount(new LambdaQueryWrapper<Like>()
+            postVO.setLiked(likeMapper.selectCount(new LambdaQueryWrapper<Like>()
                     .eq(Like::getUserId, currentUserId).eq(Like::getTargetId, id).eq(Like::getTargetType, "POST")) > 0);
-            post.setFavorited(favoriteMapper.selectCount(new LambdaQueryWrapper<Favorite>()
+            postVO.setFavorited(favoriteMapper.selectCount(new LambdaQueryWrapper<Favorite>()
                     .eq(Favorite::getUserId, currentUserId).eq(Favorite::getPostId, id)) > 0);
         }
         // 附加渔获/测评元数据
         Map<String, Object> data = new HashMap<>();
-        data.put("post", post);
+        data.put("post", postVO);
         if ("CATCH".equals(post.getPostType())) {
             CatchRecord cr = catchRecordMapper.selectOne(
                     new LambdaQueryWrapper<CatchRecord>().eq(CatchRecord::getPostId, id));
@@ -100,6 +106,7 @@ public class PostService {
     }
 
     // 发帖
+    @Transactional
     public Result<?> createPost(Post post, Long userId) {
         User currentUser = userMapper.selectById(userId);
         if (currentUser != null && currentUser.getMutedUntil() != null
@@ -121,16 +128,12 @@ public class PostService {
         if (post.getPostType() == null)
             post.setPostType("NORMAL");
         postMapper.insert(post);
-        // 更新板块帖子计数
-        Section section = sectionMapper.selectById(post.getSectionId());
-        if (section != null) {
-            section.setPostCount(section.getPostCount() + 1);
-            sectionMapper.updateById(section);
-        }
+        sectionMapper.incrementPostCount(post.getSectionId(), 1);
         return Result.ok("发帖成功", post);
     }
 
     // 更新帖子
+    @Transactional
     public Result<?> updatePost(Long id, Post updatePost, Long userId) {
         Post post = postMapper.selectById(id);
         if (post == null)
@@ -146,19 +149,21 @@ public class PostService {
     }
 
     // 删除帖子
+    @Transactional
     public Result<?> deletePost(Long id, Long userId, String role) {
         Post post = postMapper.selectById(id);
         if (post == null)
             return Result.error(404, "帖子不存在");
         if (!post.getUserId().equals(userId) && !"ADMIN".equals(role))
             return Result.error(403, "无权删除");
+        likeMapper.deleteByTarget("POST", id);
+        favoriteMapper.deleteByPostId(id);
+        commentMapper.deleteByPostId(id);
+        reportMapper.deleteByTarget("POST", id);
+        catchRecordMapper.deleteByPostId(id);
+        gearReviewMapper.deleteByPostId(id);
         postMapper.deleteById(id);
-        // 减少板块帖子计数
-        Section section = sectionMapper.selectById(post.getSectionId());
-        if (section != null && section.getPostCount() > 0) {
-            section.setPostCount(section.getPostCount() - 1);
-            sectionMapper.updateById(section);
-        }
+        sectionMapper.incrementPostCount(post.getSectionId(), -1);
         return Result.ok("删除成功");
     }
 
@@ -203,29 +208,62 @@ public class PostService {
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
                 .eq(Post::getUserId, userId).orderByDesc(Post::getCreatedAt);
         Page<Post> result = postMapper.selectPage(pageObj, wrapper);
-        result.getRecords().forEach(this::enrichPost);
+        List<PostVO> records = enrichPosts(result.getRecords());
         Map<String, Object> data = new HashMap<>();
-        data.put("records", result.getRecords());
+        data.put("records", records);
         data.put("total", result.getTotal());
         return Result.ok(data);
     }
 
-    // 填充帖子的作者、板块和标签信息
-    private void enrichPost(Post post) {
-        User author = userMapper.selectById(post.getUserId());
-        if (author != null) {
-            post.setAuthorName(author.getUsername());
-            post.setAuthorAvatar(author.getAvatar());
+    // 批量填充帖子的作者、板块和标签信息，避免列表 N+1 查询
+    private List<PostVO> enrichPosts(List<Post> posts) {
+        if (posts == null || posts.isEmpty()) {
+            return List.of();
         }
-        Section section = sectionMapper.selectById(post.getSectionId());
-        if (section != null) {
-            post.setSectionName(section.getName());
+        Map<Long, User> users = mapById(batchUsers(ids(posts, Post::getUserId)), User::getId);
+        Map<Long, Section> sections = mapById(batchSections(ids(posts, Post::getSectionId)), Section::getId);
+        Map<Long, Tag> tags = mapById(batchTags(ids(posts, Post::getTagId)), Tag::getId);
+        return posts.stream().map(post -> {
+            User author = users.get(post.getUserId());
+            if (author != null) {
+                post.setAuthorName(author.getUsername());
+                post.setAuthorAvatar(author.getAvatar());
+            }
+            Section section = sections.get(post.getSectionId());
+            if (section != null) {
+                post.setSectionName(section.getName());
+            }
+            if (post.getTagId() != null) {
+                Tag tag = tags.get(post.getTagId());
+                if (tag != null) {
+                    post.setTagName(tag.getName());
+                }
+            }
+            return PostVO.from(post);
+        }).collect(Collectors.toList());
+    }
+
+    private static <T> Collection<Long> ids(List<Post> posts, Function<Post, Long> extractor) {
+        return posts.stream().map(extractor).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private static <T> Map<Long, T> mapById(Collection<T> rows, Function<T, Long> idExtractor) {
+        if (rows == null || rows.isEmpty()) {
+            return Map.of();
         }
-        if (post.getTagId() != null) {
-            Tag tag = tagMapper.selectById(post.getTagId());
-            if (tag != null)
-                post.setTagName(tag.getName());
-        }
+        return rows.stream().collect(Collectors.toMap(idExtractor, Function.identity()));
+    }
+
+    private Collection<User> batchUsers(Collection<Long> ids) {
+        return ids.isEmpty() ? List.of() : userMapper.selectBatchIds(ids);
+    }
+
+    private Collection<Section> batchSections(Collection<Long> ids) {
+        return ids.isEmpty() ? List.of() : sectionMapper.selectBatchIds(ids);
+    }
+
+    private Collection<Tag> batchTags(Collection<Long> ids) {
+        return ids.isEmpty() ? List.of() : tagMapper.selectBatchIds(ids);
     }
 
     // 热门帖子 Top N
@@ -234,8 +272,7 @@ public class PostService {
                 .orderByDesc(Post::getViewCount)
                 .last("LIMIT " + Math.min(limit, 20));
         List<Post> posts = postMapper.selectList(wrapper);
-        posts.forEach(this::enrichPost);
-        return Result.ok(posts);
+        return Result.ok(enrichPosts(posts));
     }
 
     // 热门标签（按帖子数量统计）
@@ -253,12 +290,14 @@ public class PostService {
     }
 
     // 保存渔获记录
+    @Transactional
     public Result<?> saveCatchRecord(CatchRecord record) {
         catchRecordMapper.insert(record);
         return Result.ok(record);
     }
 
     // 保存装备测评
+    @Transactional
     public Result<?> saveGearReview(GearReview review) {
         gearReviewMapper.insert(review);
         return Result.ok(review);

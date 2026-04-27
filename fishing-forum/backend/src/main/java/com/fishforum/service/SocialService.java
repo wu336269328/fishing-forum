@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
+import com.fishforum.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -66,9 +67,8 @@ public class SocialService {
         List<User> users = follows.stream()
                 .map(f -> userMapper.selectById(f.getFollowingId()))
                 .filter(u -> u != null)
-                .peek(u -> u.setPassword(null))
                 .collect(Collectors.toList());
-        return Result.ok(users);
+        return Result.ok(users.stream().map(UserVO::from).collect(Collectors.toList()));
     }
 
     // 获取粉丝列表
@@ -78,9 +78,8 @@ public class SocialService {
         List<User> users = follows.stream()
                 .map(f -> userMapper.selectById(f.getFollowerId()))
                 .filter(u -> u != null)
-                .peek(u -> u.setPassword(null))
                 .collect(Collectors.toList());
-        return Result.ok(users);
+        return Result.ok(users.stream().map(UserVO::from).collect(Collectors.toList()));
     }
 
     // 关注动态：当前用户关注的人最近发布的帖子

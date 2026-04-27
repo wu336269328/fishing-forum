@@ -5,13 +5,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
+import com.fishforum.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.time.LocalDateTime;
+import java.util.stream.Collectors;
 
 /**
  * 后台管理服务 - 用户管理、内容审核、数据统计、公告管理
@@ -24,6 +27,11 @@ public class AdminService {
     private final PostMapper postMapper;
     private final CommentMapper commentMapper;
     private final ReportMapper reportMapper;
+    private final LikeMapper likeMapper;
+    private final FavoriteMapper favoriteMapper;
+    private final CatchRecordMapper catchRecordMapper;
+    private final GearReviewMapper gearReviewMapper;
+    private final SectionMapper sectionMapper;
     private final AnnouncementMapper announcementMapper;
     private final FishingSpotMapper spotMapper;
     private final WikiEntryMapper wikiMapper;
@@ -58,14 +66,14 @@ public class AdminService {
         }
         wrapper.orderByDesc(User::getCreatedAt);
         Page<User> result = userMapper.selectPage(pageObj, wrapper);
-        result.getRecords().forEach(u -> u.setPassword(null));
         Map<String, Object> data = new HashMap<>();
-        data.put("records", result.getRecords());
+        data.put("records", result.getRecords().stream().map(UserVO::from).collect(Collectors.toList()));
         data.put("total", result.getTotal());
         return Result.ok(data);
     }
 
     // 修改用户角色
+    @Transactional
     public Result<?> changeUserRole(Long adminId, Long userId, String role) {
         if (!"USER".equals(role) && !"ADMIN".equals(role))
             return Result.error(400, "角色不合法");
@@ -81,6 +89,7 @@ public class AdminService {
     }
 
     // 删除用户
+    @Transactional
     public Result<?> deleteUser(Long adminId, Long userId) {
         if (adminId.equals(userId))
             return Result.error(400, "不能删除当前管理员");
@@ -89,6 +98,7 @@ public class AdminService {
         return Result.ok("用户已删除");
     }
 
+    @Transactional
     public Result<?> setUserBanned(Long adminId, Long userId, boolean banned) {
         if (adminId.equals(userId))
             return Result.error(400, "不能封禁当前管理员");
@@ -101,6 +111,7 @@ public class AdminService {
         return Result.ok(banned ? "用户已封禁" : "用户已解封");
     }
 
+    @Transactional
     public Result<?> setUserMuted(Long adminId, Long userId, boolean muted, Integer minutes) {
         if (adminId.equals(userId))
             return Result.error(400, "不能禁言当前管理员");
@@ -134,6 +145,7 @@ public class AdminService {
     }
 
     // 处理举报
+    @Transactional
     public Result<?> handleReport(Long adminId, Long id, String action, String reviewNote) {
         Report report = reportMapper.selectById(id);
         if (report == null)
@@ -142,9 +154,9 @@ public class AdminService {
             report.setStatus("RESOLVED");
             // 删除被举报内容
             if ("POST".equals(report.getTargetType()))
-                postMapper.deleteById(report.getTargetId());
+                deletePostCascade(report.getTargetId());
             else if ("COMMENT".equals(report.getTargetType()))
-                commentMapper.deleteById(report.getTargetId());
+                deleteCommentCascade(report.getTargetId());
         } else {
             report.setStatus("REJECTED");
         }
@@ -172,6 +184,7 @@ public class AdminService {
                 new LambdaQueryWrapper<SensitiveWord>().orderByDesc(SensitiveWord::getCreatedAt)));
     }
 
+    @Transactional
     public Result<?> createSensitiveWord(Long adminId, String word) {
         if (word == null || word.trim().isEmpty())
             return Result.error(400, "敏感词不能为空");
@@ -184,6 +197,7 @@ public class AdminService {
         return Result.ok("敏感词已添加");
     }
 
+    @Transactional
     public Result<?> setSensitiveWordActive(Long adminId, Long id, boolean active) {
         SensitiveWord word = sensitiveWordMapper.selectById(id);
         if (word == null)
@@ -208,11 +222,13 @@ public class AdminService {
         return Result.ok(list);
     }
 
+    @Transactional
     public Result<?> createAnnouncement(Announcement announcement) {
         announcementMapper.insert(announcement);
         return Result.ok("公告发布成功");
     }
 
+    @Transactional
     public Result<?> updateAnnouncement(Long id, Announcement update) {
         Announcement ann = announcementMapper.selectById(id);
         if (ann == null)
@@ -227,6 +243,7 @@ public class AdminService {
         return Result.ok("更新成功");
     }
 
+    @Transactional
     public Result<?> deleteAnnouncement(Long id) {
         announcementMapper.deleteById(id);
         return Result.ok("删除成功");
@@ -240,5 +257,29 @@ public class AdminService {
         log.setTargetId(targetId);
         log.setDetail(detail);
         adminLogMapper.insert(log);
+    }
+
+    private void deletePostCascade(Long postId) {
+        Post post = postMapper.selectById(postId);
+        likeMapper.deleteByTarget("POST", postId);
+        favoriteMapper.deleteByPostId(postId);
+        commentMapper.deleteByPostId(postId);
+        reportMapper.deleteByTarget("POST", postId);
+        catchRecordMapper.deleteByPostId(postId);
+        gearReviewMapper.deleteByPostId(postId);
+        postMapper.deleteById(postId);
+        if (post != null) {
+            sectionMapper.incrementPostCount(post.getSectionId(), -1);
+        }
+    }
+
+    private void deleteCommentCascade(Long commentId) {
+        Comment comment = commentMapper.selectById(commentId);
+        likeMapper.deleteByTarget("COMMENT", commentId);
+        reportMapper.deleteByTarget("COMMENT", commentId);
+        commentMapper.deleteById(commentId);
+        if (comment != null) {
+            postMapper.incrementCommentCount(comment.getPostId(), -1);
+        }
     }
 }

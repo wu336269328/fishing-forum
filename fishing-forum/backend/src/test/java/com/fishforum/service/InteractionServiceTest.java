@@ -57,9 +57,8 @@ class InteractionServiceTest {
         Result<?> result = interactionService.addComment(7L, " 赞 @被提到 ", null, 3L);
 
         assertThat(result.getCode()).isEqualTo(200);
-        assertThat(post.getCommentCount()).isEqualTo(3);
         verify(commentMapper).insert(any(Comment.class));
-        verify(postMapper).updateById(post);
+        verify(postMapper).incrementCommentCount(7L, 1);
         verify(socialService).sendNotification(eq(9L), eq("COMMENT"), anyString(), anyString(), eq(7L));
         verify(socialService).sendNotification(eq(4L), eq("MENTION"), anyString(), anyString(), eq(7L));
     }
@@ -85,19 +84,15 @@ class InteractionServiceTest {
         Comment parent = comment(1L, null, 2L);
         parent.setPostId(7L);
         Comment child = comment(2L, 1L, 3L);
-        Post post = new Post();
-        post.setId(7L);
-        post.setCommentCount(4);
         when(commentMapper.selectById(1L)).thenReturn(parent);
         when(commentMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(child));
-        when(postMapper.selectById(7L)).thenReturn(post);
 
         Result<?> result = interactionService.deleteComment(1L, 2L, "USER");
 
         assertThat(result.getCode()).isEqualTo(200);
-        assertThat(post.getCommentCount()).isEqualTo(2);
         verify(commentMapper).deleteById(2L);
         verify(commentMapper).deleteById(1L);
+        verify(postMapper).incrementCommentCount(7L, -2);
     }
 
     @Test
@@ -112,8 +107,8 @@ class InteractionServiceTest {
         Result<?> result = interactionService.toggleLike(7L, "POST", 3L);
 
         assertThat(result.getData()).isEqualTo("点赞成功");
-        assertThat(post.getLikeCount()).isEqualTo(2);
         verify(likeMapper).insert(any(Like.class));
+        verify(postMapper).incrementLikeCount(7L, 1);
         verify(socialService).sendNotification(eq(9L), eq("LIKE"), anyString(), anyString(), eq(7L));
     }
 

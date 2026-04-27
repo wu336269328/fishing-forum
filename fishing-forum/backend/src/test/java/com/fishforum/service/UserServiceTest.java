@@ -7,6 +7,7 @@ import com.fishforum.entity.User;
 import com.fishforum.mapper.FollowMapper;
 import com.fishforum.mapper.PostMapper;
 import com.fishforum.mapper.UserMapper;
+import com.fishforum.vo.UserVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -68,7 +69,7 @@ class UserServiceTest {
         assertThat(result.getCode()).isEqualTo(200);
         Map<?, ?> data = (Map<?, ?>) result.getData();
         assertThat(data.get("token")).isEqualTo("jwt");
-        assertThat(((User) data.get("user")).getPassword()).isNull();
+        assertThat(((UserVO) data.get("user")).getUsername()).isEqualTo("fisher");
     }
 
     @Test

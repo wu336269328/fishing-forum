@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
+import com.fishforum.vo.UserVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -68,8 +69,7 @@ class SocialServiceTest {
 
         List<?> users = (List<?>) socialService.getFollowings(3L).getData();
 
-        assertThat(((User) users.get(0)).getPassword()).isNull();
-        assertThat(((User) users.get(0)).getUsername()).isEqualTo("friend");
+        assertThat(((UserVO) users.get(0)).getUsername()).isEqualTo("friend");
     }
 
     @Test

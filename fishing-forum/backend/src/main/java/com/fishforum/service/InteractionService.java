@@ -6,6 +6,7 @@ import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -51,6 +52,7 @@ public class InteractionService {
     }
 
     // 发表评论
+    @Transactional
     public Result<?> addComment(Long postId, String content, Long parentId, Long userId) {
         User currentUser = userMapper.selectById(userId);
         if (currentUser != null && currentUser.getMutedUntil() != null
@@ -70,14 +72,14 @@ public class InteractionService {
         // 更新帖子评论数
         Post post = postMapper.selectById(postId);
         if (post != null) {
-            post.setCommentCount(post.getCommentCount() + 1);
-            postMapper.updateById(post);
+            postMapper.incrementCommentCount(postId, 1);
             notifyCommentParticipants(post, comment, content, userId);
         }
         return Result.ok("评论成功", comment);
     }
 
     // 删除评论
+    @Transactional
     public Result<?> deleteComment(Long id, Long userId, String role) {
         Comment comment = commentMapper.selectById(id);
         if (comment == null)
@@ -91,18 +93,18 @@ public class InteractionService {
         int deletedCount = 1 + children.size();
         for (Comment child : children) {
             commentMapper.deleteById(child.getId());
+            likeMapper.deleteByTarget("COMMENT", child.getId());
+            reportMapper.deleteByTarget("COMMENT", child.getId());
         }
+        likeMapper.deleteByTarget("COMMENT", id);
+        reportMapper.deleteByTarget("COMMENT", id);
         commentMapper.deleteById(id);
-        // 减少帖子评论数
-        Post post = postMapper.selectById(comment.getPostId());
-        if (post != null && post.getCommentCount() >= deletedCount) {
-            post.setCommentCount(post.getCommentCount() - deletedCount);
-            postMapper.updateById(post);
-        }
+        postMapper.incrementCommentCount(comment.getPostId(), -deletedCount);
         return Result.ok("删除成功");
     }
 
     // 点赞/取消点赞
+    @Transactional
     public Result<?> toggleLike(Long targetId, String targetType, Long userId) {
         LambdaQueryWrapper<Like> wrapper = new LambdaQueryWrapper<Like>()
                 .eq(Like::getUserId, userId).eq(Like::getTargetId, targetId).eq(Like::getTargetType, targetType);
@@ -175,6 +177,7 @@ public class InteractionService {
     }
 
     // 收藏/取消收藏
+    @Transactional
     public Result<?> toggleFavorite(Long postId, Long userId) {
         LambdaQueryWrapper<Favorite> wrapper = new LambdaQueryWrapper<Favorite>()
                 .eq(Favorite::getUserId, userId).eq(Favorite::getPostId, postId);
@@ -204,6 +207,7 @@ public class InteractionService {
     }
 
     // 举报
+    @Transactional
     public Result<?> report(Long targetId, String targetType, String reason, Long userId) {
         Report report = new Report();
         report.setReporterId(userId);
@@ -220,14 +224,12 @@ public class InteractionService {
         if ("POST".equals(type)) {
             Post post = postMapper.selectById(targetId);
             if (post != null) {
-                post.setLikeCount(post.getLikeCount() + delta);
-                postMapper.updateById(post);
+                postMapper.incrementLikeCount(targetId, delta);
             }
         } else if ("COMMENT".equals(type)) {
             Comment c = commentMapper.selectById(targetId);
             if (c != null) {
-                c.setLikeCount(c.getLikeCount() + delta);
-                commentMapper.updateById(c);
+                commentMapper.incrementLikeCount(targetId, delta);
             }
         }
     }

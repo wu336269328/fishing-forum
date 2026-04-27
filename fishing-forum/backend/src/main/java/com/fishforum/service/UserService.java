@@ -5,9 +5,11 @@ import com.fishforum.common.JwtUtil;
 import com.fishforum.common.Result;
 import com.fishforum.entity.User;
 import com.fishforum.mapper.*;
+import com.fishforum.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.ArrayList;
@@ -28,6 +30,7 @@ public class UserService {
     private final JwtUtil jwtUtil;
 
     // 用户注册
+    @Transactional
     public Result<?> register(String username, String password, String email) {
         // 输入验证
         if (username == null || username.trim().length() < 2 || username.trim().length() > 20)
@@ -64,7 +67,7 @@ public class UserService {
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
         Map<String, Object> data = new HashMap<>();
         data.put("token", token);
-        data.put("user", sanitizeUser(user));
+        data.put("user", UserVO.from(user));
         return Result.ok("登录成功", data);
     }
 
@@ -74,7 +77,7 @@ public class UserService {
         if (user == null)
             return Result.error(404, "用户不存在");
         enrichUser(user);
-        return Result.ok(sanitizeUser(user));
+        return Result.ok(UserVO.from(user));
     }
 
     // 获取用户公开资料
@@ -83,7 +86,7 @@ public class UserService {
         if (user == null)
             return Result.error(404, "用户不存在");
         enrichUser(user);
-        return Result.ok(sanitizeUser(user));
+        return Result.ok(UserVO.from(user));
     }
 
     // 用户成长信息：基于现有行为数据计算，避免新增积分流水前就引入复杂状态
@@ -122,6 +125,7 @@ public class UserService {
     }
 
     // 更新用户信息
+    @Transactional
     public Result<?> updateProfile(Long userId, User updateUser) {
         User user = userMapper.selectById(userId);
         if (user == null)
@@ -133,10 +137,11 @@ public class UserService {
         if (updateUser.getAvatar() != null)
             user.setAvatar(updateUser.getAvatar());
         userMapper.updateById(user);
-        return Result.ok("更新成功", sanitizeUser(user));
+        return Result.ok("更新成功", UserVO.from(user));
     }
 
     // 修改密码
+    @Transactional
     public Result<?> changePassword(Long userId, String oldPassword, String newPassword) {
         User user = userMapper.selectById(userId);
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
@@ -163,9 +168,4 @@ public class UserService {
                 .intValue());
     }
 
-    // 隐藏敏感信息（密码）
-    private User sanitizeUser(User user) {
-        user.setPassword(null);
-        return user;
-    }
 }
