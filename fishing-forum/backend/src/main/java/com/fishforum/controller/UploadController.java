@@ -2,6 +2,7 @@ package com.fishforum.controller;
 
 import com.fishforum.common.FileTypeValidator;
 import com.fishforum.common.Result;
+import com.fishforum.common.UploadPathResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +35,7 @@ public class UploadController {
         }
         String fileName = UUID.randomUUID() + FileTypeValidator.safeImageExtension(file);
         // 使用绝对路径保存
-        Path dir = Paths.get(uploadPath, "images").toAbsolutePath();
+        Path dir = UploadPathResolver.resolve(uploadPath).resolve("images");
         Files.createDirectories(dir);
         Path filePath = dir.resolve(fileName);
         file.transferTo(filePath.toFile());

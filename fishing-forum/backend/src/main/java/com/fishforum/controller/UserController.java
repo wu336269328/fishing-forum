@@ -2,6 +2,7 @@ package com.fishforum.controller;
 
 import com.fishforum.common.FileTypeValidator;
 import com.fishforum.common.Result;
+import com.fishforum.common.UploadPathResolver;
 import com.fishforum.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.UUID;
 
@@ -83,7 +83,7 @@ public class UserController {
         }
         String fileName = UUID.randomUUID() + FileTypeValidator.safeImageExtension(file);
         // 使用绝对路径保存
-        Path dir = Paths.get(uploadPath, "avatars").toAbsolutePath();
+        Path dir = UploadPathResolver.resolve(uploadPath).resolve("avatars");
         Files.createDirectories(dir);
         file.transferTo(dir.resolve(fileName).toFile());
         // 更新用户头像路径
