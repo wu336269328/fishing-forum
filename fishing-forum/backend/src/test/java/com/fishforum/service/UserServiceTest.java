@@ -83,6 +83,20 @@ class UserServiceTest {
         verify(userMapper, never()).updateById(any());
     }
 
+    @Test
+    void growthProfileComputesPointsLevelAndBadgesFromExistingActivity() {
+        User user = user(3L, "fisher", "hash", "USER");
+        when(userMapper.selectById(3L)).thenReturn(user);
+        when(postMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(12L);
+        when(followMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(8L, 5L);
+
+        Map<?, ?> data = (Map<?, ?>) userService.getGrowthProfile(3L).getData();
+
+        assertThat(data.get("points")).isEqualTo(165);
+        assertThat(data.get("level")).isEqualTo(2);
+        assertThat((java.util.List<String>) data.get("badges")).contains("活跃发帖人", "受欢迎钓友");
+    }
+
     private static User user(Long id, String username, String password, String role) {
         User user = new User();
         user.setId(id);

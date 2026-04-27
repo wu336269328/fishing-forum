@@ -56,6 +56,12 @@ public class UserController {
         return userService.getCurrentUser((Long) auth.getPrincipal());
     }
 
+    // 当前用户成长信息
+    @GetMapping("/api/users/me/growth")
+    public Result<?> getGrowthProfile(Authentication auth) {
+        return userService.getGrowthProfile((Long) auth.getPrincipal());
+    }
+
     // 更新个人资料
     @PutMapping("/api/users/me")
     public Result<?> updateProfile(Authentication auth, @RequestBody com.fishforum.entity.User user) {

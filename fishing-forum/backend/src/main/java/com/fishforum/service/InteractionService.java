@@ -8,8 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -25,6 +29,9 @@ public class InteractionService {
     private final PostMapper postMapper;
     private final UserMapper userMapper;
     private final ReportMapper reportMapper;
+    private final SocialService socialService;
+
+    private static final Pattern MENTION_PATTERN = Pattern.compile("@([\\p{IsHan}\\w-]{2,20})");
 
     // 获取帖子评论（树形结构）
     public Result<?> getComments(Long postId) {
@@ -65,6 +72,7 @@ public class InteractionService {
         if (post != null) {
             post.setCommentCount(post.getCommentCount() + 1);
             postMapper.updateById(post);
+            notifyCommentParticipants(post, comment, content, userId);
         }
         return Result.ok("评论成功", comment);
     }
@@ -113,7 +121,56 @@ public class InteractionService {
             like.setTargetType(targetType);
             likeMapper.insert(like);
             updateLikeCount(targetId, targetType, 1);
+            notifyLike(targetId, targetType, userId);
             return Result.ok("点赞成功");
+        }
+    }
+
+    private void notifyCommentParticipants(Post post, Comment comment, String content, Long actorId) {
+        if (comment.getParentId() != null) {
+            Comment parent = commentMapper.selectById(comment.getParentId());
+            if (parent != null && !parent.getUserId().equals(actorId)) {
+                socialService.sendNotification(parent.getUserId(), "COMMENT_REPLY", "收到回复",
+                        "你的评论有了新回复", post.getId());
+            }
+        } else if (!post.getUserId().equals(actorId)) {
+            socialService.sendNotification(post.getUserId(), "COMMENT", "帖子有新评论",
+                    "你的帖子收到了新评论", post.getId());
+        }
+        notifyMentions(content, actorId, post.getId());
+    }
+
+    private void notifyMentions(String content, Long actorId, Long postId) {
+        if (content == null || !content.contains("@")) {
+            return;
+        }
+        Set<String> names = new HashSet<>();
+        Matcher matcher = MENTION_PATTERN.matcher(content);
+        while (matcher.find()) {
+            names.add(matcher.group(1));
+        }
+        for (String name : names) {
+            User mentioned = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, name));
+            if (mentioned != null && !mentioned.getId().equals(actorId)) {
+                socialService.sendNotification(mentioned.getId(), "MENTION", "有人提到了你",
+                        "评论中提到了 @" + name, postId);
+            }
+        }
+    }
+
+    private void notifyLike(Long targetId, String targetType, Long actorId) {
+        if ("POST".equals(targetType)) {
+            Post post = postMapper.selectById(targetId);
+            if (post != null && !post.getUserId().equals(actorId)) {
+                socialService.sendNotification(post.getUserId(), "LIKE", "帖子被点赞",
+                        "你的帖子收到了新的点赞", targetId);
+            }
+        } else if ("COMMENT".equals(targetType)) {
+            Comment comment = commentMapper.selectById(targetId);
+            if (comment != null && !comment.getUserId().equals(actorId)) {
+                socialService.sendNotification(comment.getUserId(), "LIKE", "评论被点赞",
+                        "你的评论收到了新的点赞", comment.getPostId());
+            }
         }
     }
 

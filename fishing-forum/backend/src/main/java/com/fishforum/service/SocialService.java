@@ -25,6 +25,7 @@ public class SocialService {
     private final MessageMapper messageMapper;
     private final NotificationMapper notificationMapper;
     private final UserMapper userMapper;
+    private final PostMapper postMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
     // ========== 关注功能 ==========
@@ -80,6 +81,34 @@ public class SocialService {
                 .peek(u -> u.setPassword(null))
                 .collect(Collectors.toList());
         return Result.ok(users);
+    }
+
+    // 关注动态：当前用户关注的人最近发布的帖子
+    public Result<?> getFollowFeed(Long userId, int page, int size) {
+        List<Long> followingIds = followMapper.selectList(
+                new LambdaQueryWrapper<Follow>().eq(Follow::getFollowerId, userId))
+                .stream()
+                .map(Follow::getFollowingId)
+                .collect(Collectors.toList());
+        if (followingIds.isEmpty()) {
+            return Result.ok(Map.of("records", List.of(), "total", 0L, "pages", 0L));
+        }
+        Page<Post> pageObj = new Page<>(page, size);
+        Page<Post> result = postMapper.selectPage(pageObj, new LambdaQueryWrapper<Post>()
+                .in(Post::getUserId, followingIds)
+                .orderByDesc(Post::getCreatedAt));
+        result.getRecords().forEach(post -> {
+            User author = userMapper.selectById(post.getUserId());
+            if (author != null) {
+                post.setAuthorName(author.getUsername());
+                post.setAuthorAvatar(author.getAvatar());
+            }
+        });
+        Map<String, Object> data = new HashMap<>();
+        data.put("records", result.getRecords());
+        data.put("total", result.getTotal());
+        data.put("pages", result.getPages());
+        return Result.ok(data);
     }
 
     // ========== 私信功能 ==========

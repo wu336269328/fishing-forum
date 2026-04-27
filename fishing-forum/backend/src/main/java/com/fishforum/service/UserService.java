@@ -10,6 +10,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -82,6 +84,41 @@ public class UserService {
             return Result.error(404, "用户不存在");
         enrichUser(user);
         return Result.ok(sanitizeUser(user));
+    }
+
+    // 用户成长信息：基于现有行为数据计算，避免新增积分流水前就引入复杂状态
+    public Result<?> getGrowthProfile(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null)
+            return Result.error(404, "用户不存在");
+        long posts = postMapper.selectCount(
+                new LambdaQueryWrapper<com.fishforum.entity.Post>().eq(com.fishforum.entity.Post::getUserId, userId));
+        long followers = followMapper.selectCount(
+                new LambdaQueryWrapper<com.fishforum.entity.Follow>().eq(com.fishforum.entity.Follow::getFollowingId,
+                        userId));
+        long following = followMapper.selectCount(
+                new LambdaQueryWrapper<com.fishforum.entity.Follow>().eq(com.fishforum.entity.Follow::getFollowerId,
+                        userId));
+        int points = (int) (posts * 10 + followers * 5 + following);
+        int level = Math.max(1, points / 100 + 1);
+        List<String> badges = new ArrayList<>();
+        if (posts >= 1)
+            badges.add("首帖纪念");
+        if (posts >= 10)
+            badges.add("活跃发帖人");
+        if (followers >= 5)
+            badges.add("受欢迎钓友");
+        if (following >= 5)
+            badges.add("社交达人");
+        Map<String, Object> data = new HashMap<>();
+        data.put("points", points);
+        data.put("level", level);
+        data.put("posts", posts);
+        data.put("followers", followers);
+        data.put("following", following);
+        data.put("badges", badges);
+        data.put("nextLevelPoints", level * 100);
+        return Result.ok(data);
     }
 
     // 更新用户信息

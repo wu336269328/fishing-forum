@@ -82,6 +82,8 @@
         </el-form-item>
         <div class="form-actions">
           <el-button @click="$router.back()">取消</el-button>
+          <el-button @click="saveDraft">保存草稿</el-button>
+          <el-button v-if="hasDraft" @click="clearDraft">清空草稿</el-button>
           <el-button type="primary" @click="handleSubmit" :loading="loading">发布</el-button>
         </div>
       </el-form>
@@ -97,9 +99,48 @@ import request from '../api/request'
 
 const router = useRouter(), loading = ref(false), uploading = ref(false)
 const sections = ref([]), tags = ref([]), images = ref([])
+const hasDraft = ref(false)
+const DRAFT_KEY = 'fishforum:create-post-draft'
 const form = ref({ title: '', content: '', sectionId: null, tagId: null, postType: 'NORMAL' })
 const catchForm = ref({ fishSpecies: '', weight: null, bait: '', spotName: '', weather: '', fishingDate: '' })
 const reviewForm = ref({ brand: '', model: '', gearCategory: '鱼竿', price: null, rating: 3, pros: '', cons: '' })
+
+const draftPayload = () => ({
+  form: form.value,
+  catchForm: catchForm.value,
+  reviewForm: reviewForm.value,
+  images: images.value,
+  savedAt: new Date().toISOString()
+})
+
+const saveDraft = () => {
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(draftPayload()))
+  hasDraft.value = true
+  ElMessage.success('草稿已保存')
+}
+
+const restoreDraft = () => {
+  const raw = localStorage.getItem(DRAFT_KEY)
+  hasDraft.value = !!raw
+  if (!raw) return
+  try {
+    const draft = JSON.parse(raw)
+    form.value = { ...form.value, ...(draft.form || {}) }
+    catchForm.value = { ...catchForm.value, ...(draft.catchForm || {}) }
+    reviewForm.value = { ...reviewForm.value, ...(draft.reviewForm || {}) }
+    images.value = draft.images || []
+    ElMessage.info('已恢复上次草稿')
+  } catch (e) {
+    localStorage.removeItem(DRAFT_KEY)
+    hasDraft.value = false
+  }
+}
+
+const clearDraft = () => {
+  localStorage.removeItem(DRAFT_KEY)
+  hasDraft.value = false
+  ElMessage.success('草稿已清空')
+}
 
 const uploadImage = async (e) => {
   const file = e.target.files[0]; if (!file) return
@@ -135,12 +176,20 @@ const handleSubmit = async () => {
   if (form.value.postType === 'REVIEW') body.gearReview = reviewForm.value
 
   const r = await request.post('/api/posts', body)
-  if (r.code === 200) { ElMessage.success('发帖成功'); router.push(`/post/${r.data.id}`) }
+  if (r.code === 200) { clearDraft(); ElMessage.success('发帖成功'); router.push(`/post/${r.data.id}`) }
   else ElMessage.error(r.message)
   loading.value = false
 }
 
+watch([form, catchForm, reviewForm, images], () => {
+  if (form.value.title || form.value.content || images.value.length) {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draftPayload()))
+    hasDraft.value = true
+  }
+}, { deep: true })
+
 onMounted(async () => {
+  restoreDraft()
   const r = await request.get('/api/sections'); if (r.code === 200) sections.value = r.data || []
   await loadTags()
 })

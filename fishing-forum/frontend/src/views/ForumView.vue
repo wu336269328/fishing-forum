@@ -62,15 +62,18 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useUserStore } from '../stores/user'
 import request from '../api/request'
 
 const route = useRoute()
+const userStore = useUserStore()
 const posts = ref([]), sections = ref([]), tags = ref([])
 const selectedSection = ref(null), selectedTag = ref(null), selectedType = ref('')
 const keyword = ref(''), sortBy = ref('latest'), currentPage = ref(1), total = ref(0)
 
 const postTypes = [
   { value: '', label: '全部', icon: '📋' },
+  { value: 'FOLLOWING', label: '关注动态', icon: '👀' },
   { value: 'NORMAL', label: '讨论', icon: '💬' },
   { value: 'CATCH', label: '渔获日记', icon: '🐟' },
   { value: 'REVIEW', label: '装备测评', icon: '⭐' }
@@ -80,6 +83,12 @@ const formatTime = (t) => { if (!t) return ''; const d=new Date(t),now=new Date(
 const stripHtml = (h) => h ? h.replace(/<[^>]+>/g,'').substring(0,120) : ''
 
 const loadPosts = async () => {
+  if (selectedType.value === 'FOLLOWING') {
+    if (!userStore.isLoggedIn) { posts.value = []; total.value = 0; return }
+    const feed = await request.get('/api/follows/feed', { params: { page: currentPage.value, size: 10 } })
+    if (feed.code === 200) { posts.value = feed.data.records || []; total.value = feed.data.total || 0 }
+    return
+  }
   const params = { page: currentPage.value, size: 10, sectionId: selectedSection.value, keyword: keyword.value, sort: sortBy.value }
   if (selectedType.value) params.postType = selectedType.value
   if (selectedTag.value) params.tagId = selectedTag.value

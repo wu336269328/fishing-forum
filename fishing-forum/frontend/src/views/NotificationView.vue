@@ -16,12 +16,18 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '../api/request'
 
+const router = useRouter()
 const notifications = ref([]), page = ref(1), total = ref(0)
 const load = async () => { const r = await request.get('/api/notifications',{params:{page:page.value,size:20}}); if(r.code===200){ notifications.value=r.data.records||[]; total.value=r.data.total||0 } }
-const markRead = async (n) => { if(!n.isRead){ await request.put(`/api/notifications/${n.id}/read`); n.isRead=true } }
+const markRead = async (n) => {
+  if(!n.isRead){ await request.put(`/api/notifications/${n.id}/read`); n.isRead=true }
+  if (['LIKE','COMMENT','COMMENT_REPLY','MENTION'].includes(n.type) && n.relatedId) router.push(`/post/${n.relatedId}`)
+  else if (n.type === 'FOLLOW' && n.relatedId) router.push(`/profile/${n.relatedId}`)
+}
 const markAllRead = async () => { await request.put('/api/notifications/read-all'); notifications.value.forEach(n=>n.isRead=true); ElMessage.success('全部已读') }
 onMounted(load)
 </script>

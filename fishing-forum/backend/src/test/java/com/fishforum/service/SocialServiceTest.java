@@ -26,6 +26,7 @@ class SocialServiceTest {
     @Mock MessageMapper messageMapper;
     @Mock NotificationMapper notificationMapper;
     @Mock UserMapper userMapper;
+    @Mock PostMapper postMapper;
     @Mock SimpMessagingTemplate messagingTemplate;
     @InjectMocks SocialService socialService;
 
@@ -110,6 +111,28 @@ class SocialServiceTest {
         assertThat(data.get("notifications")).isEqualTo(2L);
         assertThat(data.get("messages")).isEqualTo(3L);
         assertThat(data.get("total")).isEqualTo(5L);
+    }
+
+    @Test
+    void followFeedReturnsPostsFromFollowedUsers() {
+        Follow follow = new Follow();
+        follow.setFollowerId(3L);
+        follow.setFollowingId(4L);
+        Post post = new Post();
+        post.setId(11L);
+        post.setUserId(4L);
+        when(followMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(follow));
+        Page<Post> page = new Page<>(1, 10);
+        page.setRecords(List.of(post));
+        page.setTotal(1);
+        when(postMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
+        when(userMapper.selectById(4L)).thenReturn(user(4L, "friend"));
+
+        Map<?, ?> data = (Map<?, ?>) socialService.getFollowFeed(3L, 1, 10).getData();
+
+        assertThat(data.get("total")).isEqualTo(1L);
+        Post record = (Post) ((List<?>) data.get("records")).get(0);
+        assertThat(record.getAuthorName()).isEqualTo("friend");
     }
 
     private static User user(Long id, String username) {

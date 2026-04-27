@@ -46,6 +46,14 @@ public class SocialController {
         return socialService.getFollowers(userId);
     }
 
+    // 关注动态
+    @GetMapping("/follows/feed")
+    public Result<?> getFollowFeed(Authentication auth,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return socialService.getFollowFeed((Long) auth.getPrincipal(), page, size);
+    }
+
     // ========== 私信 ==========
 
     // 发送私信

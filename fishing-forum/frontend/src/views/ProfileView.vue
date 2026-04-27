@@ -29,6 +29,7 @@
     <!-- Tab 切换 -->
     <div class="tab-bar">
       <div :class="['tab-item', {active: activeTab==='posts'}]" @click="activeTab='posts'">📝 {{ isOwn ? '我的帖子' : 'TA的帖子' }}</div>
+      <div v-if="isOwn" :class="['tab-item', {active: activeTab==='growth'}]" @click="activeTab='growth'; loadGrowth()">🏅 成长</div>
       <div v-if="isOwn" :class="['tab-item', {active: activeTab==='favorites'}]" @click="activeTab='favorites'; loadFavorites()">⭐ 我的收藏</div>
       <div v-if="isOwn" :class="['tab-item', {active: activeTab==='edit'}]" @click="activeTab='edit'">✏️ 编辑资料</div>
     </div>
@@ -45,6 +46,26 @@
         </div>
       </div>
       <el-empty v-if="!userPosts.length" description="暂无帖子" :image-size="40" />
+    </template>
+
+    <!-- 成长信息 -->
+    <template v-if="activeTab==='growth'">
+      <div class="card growth-card">
+        <div>
+          <div class="growth-level">Lv.{{ growth.level || 1 }}</div>
+          <div class="text-muted">积分 {{ growth.points || 0 }} / {{ growth.nextLevelPoints || 100 }}</div>
+        </div>
+        <el-progress :percentage="growthProgress" :stroke-width="10" />
+        <div class="growth-grid">
+          <div><b>{{ growth.posts || 0 }}</b><span>发帖</span></div>
+          <div><b>{{ growth.followers || 0 }}</b><span>粉丝</span></div>
+          <div><b>{{ growth.following || 0 }}</b><span>关注</span></div>
+        </div>
+        <div class="badge-row">
+          <el-tag v-for="b in growth.badges || []" :key="b" effect="plain">{{ b }}</el-tag>
+          <el-empty v-if="!(growth.badges || []).length" description="继续发帖互动解锁徽章" :image-size="32" />
+        </div>
+      </div>
     </template>
 
     <!-- 收藏列表 -->
@@ -120,6 +141,7 @@ import request from '../api/request'
 
 const route = useRoute(), router = useRouter(), userStore = useUserStore()
 const profile = ref(null), userPosts = ref([]), favorites = ref([]), isFollowing = ref(false)
+const growth = ref({})
 const editForm = ref({ bio: '', email: '' })
 const pwForm = ref({ oldPassword: '', newPassword: '' })
 const fileInput = ref(null)
@@ -141,6 +163,16 @@ const load = async () => {
 const loadFavorites = async () => {
   const r = await request.get('/api/favorites')
   if (r.code === 200) favorites.value = r.data || []
+}
+
+const growthProgress = computed(() => {
+  const next = growth.value.nextLevelPoints || 100
+  return Math.min(100, Math.round(((growth.value.points || 0) / next) * 100))
+})
+
+const loadGrowth = async () => {
+  const r = await request.get('/api/users/me/growth')
+  if (r.code === 200) growth.value = r.data || {}
 }
 
 const triggerUpload = () => fileInput.value?.click()
@@ -222,6 +254,13 @@ watch(() => route.params.id, load)
 .tab-item { padding: 8px 16px; font-size: 14px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
 .tab-item:hover { color: #1a73e8; }
 .tab-item.active { color: #1a73e8; border-bottom-color: #1a73e8; font-weight: 500; }
+.growth-card { display: grid; gap: 14px; }
+.growth-level { font-size: 30px; font-weight: 900; color: var(--blue); }
+.growth-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.growth-grid div { border: 1px solid var(--line); border-radius: 14px; padding: 12px; text-align: center; background: var(--green-soft); }
+.growth-grid b { display: block; font-size: 20px; color: var(--ink); }
+.growth-grid span { font-size: 12px; color: var(--muted); }
+.badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 768px) {
   .profile-top { align-items: center; }
   .profile-info { min-width: 100%; }

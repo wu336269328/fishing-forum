@@ -25,6 +25,7 @@ class InteractionServiceTest {
     @Mock PostMapper postMapper;
     @Mock UserMapper userMapper;
     @Mock ReportMapper reportMapper;
+    @Mock SocialService socialService;
     @InjectMocks InteractionService interactionService;
 
     @Test
@@ -48,15 +49,35 @@ class InteractionServiceTest {
     void addCommentInsertsAndIncrementsPostCommentCount() {
         Post post = new Post();
         post.setId(7L);
+        post.setUserId(9L);
         post.setCommentCount(2);
         when(postMapper.selectById(7L)).thenReturn(post);
+        when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user(4L, "被提到"));
 
-        Result<?> result = interactionService.addComment(7L, " 赞 ", null, 3L);
+        Result<?> result = interactionService.addComment(7L, " 赞 @被提到 ", null, 3L);
 
         assertThat(result.getCode()).isEqualTo(200);
         assertThat(post.getCommentCount()).isEqualTo(3);
         verify(commentMapper).insert(any(Comment.class));
         verify(postMapper).updateById(post);
+        verify(socialService).sendNotification(eq(9L), eq("COMMENT"), anyString(), anyString(), eq(7L));
+        verify(socialService).sendNotification(eq(4L), eq("MENTION"), anyString(), anyString(), eq(7L));
+    }
+
+    @Test
+    void replyCommentNotifiesParentCommentAuthor() {
+        Post post = new Post();
+        post.setId(7L);
+        post.setUserId(9L);
+        post.setCommentCount(2);
+        Comment parent = comment(6L, null, 8L);
+        when(postMapper.selectById(7L)).thenReturn(post);
+        when(commentMapper.selectById(6L)).thenReturn(parent);
+
+        Result<?> result = interactionService.addComment(7L, "回复", 6L, 3L);
+
+        assertThat(result.getCode()).isEqualTo(200);
+        verify(socialService).sendNotification(eq(8L), eq("COMMENT_REPLY"), anyString(), anyString(), eq(7L));
     }
 
     @Test
@@ -83,6 +104,7 @@ class InteractionServiceTest {
     void toggleLikeCreatesAndRemovesLikeWhileUpdatingPostCount() {
         Post post = new Post();
         post.setId(7L);
+        post.setUserId(9L);
         post.setLikeCount(1);
         when(likeMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         when(postMapper.selectById(7L)).thenReturn(post);
@@ -92,6 +114,7 @@ class InteractionServiceTest {
         assertThat(result.getData()).isEqualTo("点赞成功");
         assertThat(post.getLikeCount()).isEqualTo(2);
         verify(likeMapper).insert(any(Like.class));
+        verify(socialService).sendNotification(eq(9L), eq("LIKE"), anyString(), anyString(), eq(7L));
     }
 
     @Test
