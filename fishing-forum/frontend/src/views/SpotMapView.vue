@@ -22,7 +22,10 @@
               <span>🐟 {{ s.fishTypes }}</span>
               <span>⭐ {{ s.rating }}</span>
               <span>🕐 {{ s.openTime }}</span>
+              <span v-if="s.bestSeason">🌿 {{ s.bestSeason }}</span>
+              <span v-if="s.feeInfo">💰 {{ s.feeInfo }}</span>
             </div>
+            <div v-if="s.noFishingNotice" class="warning-line">禁钓提醒：{{ s.noFishingNotice }}</div>
             <div style="font-size:12px; margin-top:4px; display:flex; gap:8px">
               <a :href="toGoogleMap(s)" target="_blank" @click.stop class="map-link">📍 谷歌地图</a>
               <a :href="toAmapLink(s)" target="_blank" @click.stop class="map-link">🗺️ 高德地图</a>
@@ -37,6 +40,8 @@
     <el-dialog v-model="showDetail" :title="selected?.name" width="550px" v-if="selected">
       <img v-if="selected.imageUrl" :src="selected.imageUrl" style="width:100%; max-height:240px; object-fit:cover; border-radius:6px; margin-bottom:12px" />
       <p style="margin-bottom:8px"><b>类型：</b>{{ selected.spotType }}　<b>鱼种：</b>{{ selected.fishTypes }}　<b>开放：</b>{{ selected.openTime }}</p>
+      <p style="margin-bottom:8px"><b>适钓季节：</b>{{ selected.bestSeason || '未填写' }}　<b>收费：</b>{{ selected.feeInfo || '未填写' }}</p>
+      <el-alert v-if="selected.noFishingNotice" type="warning" :closable="false" style="margin-bottom:10px" :title="`禁钓提醒：${selected.noFishingNotice}`" />
       <p style="margin-bottom:8px; line-height:1.6">{{ selected.description }}</p>
       <div style="display:flex; gap:12px; margin:12px 0; padding:10px; background:#f9f9f9; border-radius:6px">
         <div style="flex:1">
@@ -45,6 +50,7 @@
         <a :href="toGoogleMap(selected)" target="_blank" class="map-btn">谷歌地图 →</a>
         <a :href="toAmapLink(selected)" target="_blank" class="map-btn">高德地图 →</a>
       </div>
+      <el-button v-if="userStore.isLoggedIn" size="small" @click="toggleSpotFavorite(selected)">⭐ 收藏/取消收藏钓点</el-button>
       <hr class="section-divider" />
       <h4 style="margin-bottom:8px">评价</h4>
       <div v-for="r in reviews" :key="r.id" style="padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:13px">
@@ -77,6 +83,9 @@
         </el-form-item>
         <el-form-item label="鱼种"><el-input v-model="addForm.fishTypes" placeholder="如: 鲫鱼,鲤鱼,草鱼" /></el-form-item>
         <el-form-item label="开放时间"><el-input v-model="addForm.openTime" placeholder="如: 全天开放 / 06:00-20:00" /></el-form-item>
+        <el-form-item label="适钓季节"><el-input v-model="addForm.bestSeason" placeholder="如: 春秋最佳 / 夏季夜钓" /></el-form-item>
+        <el-form-item label="收费信息"><el-input v-model="addForm.feeInfo" placeholder="如: 免费 / 50元每天 / 按竿收费" /></el-form-item>
+        <el-form-item label="禁钓提醒"><el-input v-model="addForm.noFishingNotice" placeholder="如: 繁殖期禁钓 / 汛期危险" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="addForm.description" type="textarea" :rows="3" /></el-form-item>
         <el-form-item label="钓点图片">
           <div style="display:flex; gap:8px; align-items:center">
@@ -103,7 +112,8 @@ const userStore = useUserStore()
 const spots = ref([]), keyword = ref(''), spotType = ref(''), selected = ref(null), showDetail = ref(false), showAdd = ref(false), reviews = ref([])
 const reviewForm = ref({ rating: 5, content: '' })
 const locating = ref(false), locMsg = ref(''), spotUploading = ref(false)
-const addForm = ref({ name: '', spotType: '水库', latitude: null, longitude: null, fishTypes: '', openTime: '全天开放', description: '', imageUrl: '' })
+const emptySpotForm = () => ({ name: '', spotType: '水库', latitude: null, longitude: null, fishTypes: '', openTime: '全天开放', bestSeason: '', feeInfo: '', noFishingNotice: '', description: '', imageUrl: '' })
+const addForm = ref(emptySpotForm())
 
 // 地图链接
 const toGoogleMap = (s) => `https://www.google.com/maps?q=${s.latitude},${s.longitude}`
@@ -112,6 +122,11 @@ const toAmapLink = (s) => `https://uri.amap.com/marker?position=${s.longitude},$
 const loadSpots = async () => { const r = await request.get('/api/spots', { params: { keyword: keyword.value, spotType: spotType.value, page: 1, size: 50 } }); if (r.code === 200) spots.value = r.data.records || [] }
 const loadReviews = async (id) => { const r = await request.get(`/api/spots/${id}/reviews`); if (r.code === 200) reviews.value = r.data || [] }
 const submitReview = async () => { if (!reviewForm.value.content.trim()) return; await request.post(`/api/spots/${selected.value.id}/reviews`, reviewForm.value); ElMessage.success('已评价'); reviewForm.value = { rating: 5, content: '' }; loadReviews(selected.value.id); loadSpots() }
+
+const toggleSpotFavorite = async (spot) => {
+  const r = await request.post(`/api/spots/${spot.id}/favorite`)
+  if (r.code === 200) ElMessage.success(r.data || r.message)
+}
 
 const getLocation = () => {
   if (!navigator.geolocation) return ElMessage.warning('浏览器不支持定位')
@@ -139,7 +154,7 @@ const submitSpot = async () => {
   if (!addForm.value.latitude || !addForm.value.longitude) return ElMessage.warning('请输入位置坐标或使用定位')
   await request.post('/api/spots', addForm.value)
   ElMessage.success('钓点已分享'); showAdd.value = false
-  addForm.value = { name: '', spotType: '水库', latitude: null, longitude: null, fishTypes: '', openTime: '全天开放', description: '', imageUrl: '' }
+  addForm.value = emptySpotForm()
   loadSpots()
 }
 
@@ -157,6 +172,7 @@ onMounted(loadSpots)
 .map-link:hover { text-decoration: underline; }
 .map-btn { background: #1a73e8; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 12px; text-decoration: none; white-space: nowrap; }
 .map-btn:hover { background: #1558b0; }
+.warning-line { font-size: 12px; color: #b45309; margin-top: 4px; line-height: 1.4; }
 .img-upload-btn { width: 80px; height: 80px; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #999; cursor: pointer; text-align: center; padding: 4px; }
 .img-upload-btn:hover { border-color: #1a73e8; color: #1a73e8; }
 @media (max-width: 900px) { .spots-grid { grid-template-columns: 1fr; } }

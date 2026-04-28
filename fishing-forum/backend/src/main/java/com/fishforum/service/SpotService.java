@@ -7,6 +7,7 @@ import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +22,7 @@ public class SpotService {
 
     private final FishingSpotMapper spotMapper;
     private final SpotReviewMapper reviewMapper;
+    private final SpotFavoriteMapper spotFavoriteMapper;
     private final UserMapper userMapper;
 
     // 获取钓点列表
@@ -59,6 +61,7 @@ public class SpotService {
     }
 
     // 新增钓点
+    @Transactional
     public Result<?> createSpot(FishingSpot spot, Long userId) {
         spot.setUserId(userId);
         spot.setRating(0.0);
@@ -68,6 +71,7 @@ public class SpotService {
     }
 
     // 更新钓点
+    @Transactional
     public Result<?> updateSpot(Long id, FishingSpot update, Long userId) {
         FishingSpot spot = spotMapper.selectById(id);
         if (spot == null)
@@ -84,22 +88,31 @@ public class SpotService {
             spot.setSpotType(update.getSpotType());
         if (update.getOpenTime() != null)
             spot.setOpenTime(update.getOpenTime());
+        if (update.getBestSeason() != null)
+            spot.setBestSeason(update.getBestSeason());
+        if (update.getFeeInfo() != null)
+            spot.setFeeInfo(update.getFeeInfo());
+        if (update.getNoFishingNotice() != null)
+            spot.setNoFishingNotice(update.getNoFishingNotice());
         spotMapper.updateById(spot);
         return Result.ok("更新成功");
     }
 
     // 删除钓点
+    @Transactional
     public Result<?> deleteSpot(Long id, Long userId, String role) {
         FishingSpot spot = spotMapper.selectById(id);
         if (spot == null)
             return Result.error(404, "钓点不存在");
         if (!spot.getUserId().equals(userId) && !"ADMIN".equals(role))
             return Result.error(403, "无权删除");
+        spotFavoriteMapper.deleteBySpotId(id);
         spotMapper.deleteById(id);
         return Result.ok("删除成功");
     }
 
     // 添加评价
+    @Transactional
     public Result<?> addReview(Long spotId, Integer rating, String content, Long userId) {
         SpotReview review = new SpotReview();
         review.setSpotId(spotId);
@@ -110,6 +123,36 @@ public class SpotService {
         // 更新平均评分
         updateRating(spotId);
         return Result.ok("评价成功");
+    }
+
+    @Transactional
+    public Result<?> toggleFavorite(Long spotId, Long userId) {
+        LambdaQueryWrapper<SpotFavorite> wrapper = new LambdaQueryWrapper<SpotFavorite>()
+                .eq(SpotFavorite::getUserId, userId)
+                .eq(SpotFavorite::getSpotId, spotId);
+        SpotFavorite existing = spotFavoriteMapper.selectOne(wrapper);
+        if (existing != null) {
+            spotFavoriteMapper.deleteById(existing.getId());
+            return Result.ok("已取消收藏");
+        }
+        SpotFavorite favorite = new SpotFavorite();
+        favorite.setSpotId(spotId);
+        favorite.setUserId(userId);
+        spotFavoriteMapper.insert(favorite);
+        return Result.ok("已收藏钓点");
+    }
+
+    public Result<?> getUserFavorites(Long userId) {
+        List<SpotFavorite> favorites = spotFavoriteMapper.selectList(
+                new LambdaQueryWrapper<SpotFavorite>()
+                        .eq(SpotFavorite::getUserId, userId)
+                        .orderByDesc(SpotFavorite::getCreatedAt));
+        List<FishingSpot> spots = favorites.stream()
+                .map(f -> spotMapper.selectById(f.getSpotId()))
+                .filter(s -> s != null)
+                .toList();
+        spots.forEach(this::enrichSpot);
+        return Result.ok(spots);
     }
 
     // 获取钓点评价列表

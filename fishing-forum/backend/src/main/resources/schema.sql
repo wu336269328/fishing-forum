@@ -136,12 +136,24 @@ CREATE TABLE IF NOT EXISTS fishing_spots (
     fish_types VARCHAR(500),
     spot_type VARCHAR(50),           -- 水库 / 河流 / 湖泊 / 海钓 / 黑坑
     open_time VARCHAR(200),
+    best_season VARCHAR(200),
+    fee_info VARCHAR(200),
+    no_fishing_notice TEXT,
     rating DOUBLE PRECISION DEFAULT 0,
     review_count INTEGER DEFAULT 0,
     user_id BIGINT NOT NULL REFERENCES users(id),
     image_url VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted INTEGER DEFAULT 0
+);
+
+-- 钓点收藏表
+CREATE TABLE IF NOT EXISTS spot_favorites (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    spot_id BIGINT NOT NULL REFERENCES fishing_spots(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, spot_id)
 );
 
 -- 钓点评价表
@@ -278,6 +290,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_comments_entry ON wiki_comments(entry_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_comments_user ON wiki_comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_spot_favorites_user ON spot_favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);

@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
 import com.fishforum.entity.FishingSpot;
+import com.fishforum.entity.SpotFavorite;
 import com.fishforum.entity.SpotReview;
 import com.fishforum.entity.User;
 import com.fishforum.mapper.FishingSpotMapper;
+import com.fishforum.mapper.SpotFavoriteMapper;
 import com.fishforum.mapper.SpotReviewMapper;
 import com.fishforum.mapper.UserMapper;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ class SpotServiceTest {
 
     @Mock FishingSpotMapper spotMapper;
     @Mock SpotReviewMapper reviewMapper;
+    @Mock SpotFavoriteMapper spotFavoriteMapper;
     @Mock UserMapper userMapper;
     @InjectMocks SpotService spotService;
 
@@ -50,6 +53,9 @@ class SpotServiceTest {
     void createSpotInitializesOwnerRatingAndReviewCount() {
         FishingSpot spot = new FishingSpot();
         spot.setName("新钓点");
+        spot.setBestSeason("春季,秋季");
+        spot.setFeeInfo("免费");
+        spot.setNoFishingNotice("汛期禁钓");
 
         Result<?> result = spotService.createSpot(spot, 3L);
 
@@ -57,6 +63,9 @@ class SpotServiceTest {
         assertThat(spot.getUserId()).isEqualTo(3L);
         assertThat(spot.getRating()).isEqualTo(0.0);
         assertThat(spot.getReviewCount()).isZero();
+        assertThat(spot.getBestSeason()).isEqualTo("春季,秋季");
+        assertThat(spot.getFeeInfo()).isEqualTo("免费");
+        assertThat(spot.getNoFishingNotice()).isEqualTo("汛期禁钓");
         verify(spotMapper).insert(spot);
     }
 
@@ -69,6 +78,60 @@ class SpotServiceTest {
         assertThat(spotService.deleteSpot(7L, 4L, "USER").getCode()).isEqualTo(403);
         assertThat(spotService.deleteSpot(7L, 4L, "ADMIN").getCode()).isEqualTo(200);
         verify(spotMapper).deleteById(7L);
+    }
+
+    @Test
+    void updateSpotAllowsOwnerToEditFishingSpecificFields() {
+        FishingSpot spot = spot(7L, 3L);
+        FishingSpot update = new FishingSpot();
+        update.setBestSeason("夏季夜钓");
+        update.setFeeInfo("50元/天");
+        update.setNoFishingNotice("繁殖期禁钓");
+        when(spotMapper.selectById(7L)).thenReturn(spot);
+
+        Result<?> result = spotService.updateSpot(7L, update, 3L);
+
+        assertThat(result.getData()).isEqualTo("更新成功");
+        assertThat(spot.getBestSeason()).isEqualTo("夏季夜钓");
+        assertThat(spot.getFeeInfo()).isEqualTo("50元/天");
+        assertThat(spot.getNoFishingNotice()).isEqualTo("繁殖期禁钓");
+        verify(spotMapper).updateById(spot);
+    }
+
+    @Test
+    void toggleFavoriteCreatesAndRemovesSpotFavorite() {
+        when(spotFavoriteMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+
+        Result<?> created = spotService.toggleFavorite(7L, 3L);
+
+        assertThat(created.getData()).isEqualTo("已收藏钓点");
+        verify(spotFavoriteMapper).insert(argThat(f -> f.getSpotId().equals(7L) && f.getUserId().equals(3L)));
+
+        SpotFavorite existing = new SpotFavorite();
+        existing.setId(9L);
+        when(spotFavoriteMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(existing);
+
+        Result<?> removed = spotService.toggleFavorite(7L, 3L);
+
+        assertThat(removed.getData()).isEqualTo("已取消收藏");
+        verify(spotFavoriteMapper).deleteById(9L);
+    }
+
+    @Test
+    void getUserFavoritesReturnsFavoriteSpotsWithAuthors() {
+        SpotFavorite favorite = new SpotFavorite();
+        favorite.setSpotId(7L);
+        FishingSpot spot = spot(7L, 3L);
+        when(spotFavoriteMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(favorite));
+        when(spotMapper.selectById(7L)).thenReturn(spot);
+        User user = new User(); user.setId(3L); user.setUsername("creator");
+        when(userMapper.selectById(3L)).thenReturn(user);
+
+        List<?> favorites = (List<?>) spotService.getUserFavorites(4L).getData();
+
+        FishingSpot returned = (FishingSpot) favorites.get(0);
+        assertThat(returned.getId()).isEqualTo(7L);
+        assertThat(returned.getAuthorName()).isEqualTo("creator");
     }
 
     @Test

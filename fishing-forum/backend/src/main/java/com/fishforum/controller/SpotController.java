@@ -73,4 +73,11 @@ public class SpotController {
     public Result<?> getReviews(@PathVariable Long spotId) {
         return spotService.getReviews(spotId);
     }
+
+    // 收藏/取消收藏钓点
+    @PostMapping("/{spotId}/favorite")
+    public Result<?> toggleFavorite(@PathVariable Long spotId, Authentication auth) {
+        return spotService.toggleFavorite(spotId, (Long) auth.getPrincipal());
+    }
+
 }

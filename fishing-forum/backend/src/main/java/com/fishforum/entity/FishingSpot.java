@@ -19,6 +19,9 @@ public class FishingSpot {
     private String fishTypes; // 鱼种列表（逗号分隔）
     private String spotType; // 水库/河流/湖泊/海钓/黑坑
     private String openTime;
+    private String bestSeason;
+    private String feeInfo;
+    private String noFishingNotice;
     private Double rating;
     private Integer reviewCount;
     private Long userId;
