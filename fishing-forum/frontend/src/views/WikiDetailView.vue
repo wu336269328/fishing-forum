@@ -47,8 +47,64 @@
       </div>
 
       <div class="card">
-        <h3 style="font-size:15px; margin-bottom:8px">💬 词条讨论</h3>
-        <p class="text-muted">百科讨论功能需要独立的数据模型支持，当前页面不再复用帖子评论接口，避免词条 ID 与帖子 ID 冲突导致数据串联。</p>
+        <div class="section-head">
+          <h3>💬 词条讨论</h3>
+          <span class="text-muted">{{ wikiComments.length }} 条讨论</span>
+        </div>
+        <div v-if="userStore.isLoggedIn" class="comment-editor">
+          <el-input v-model="commentContent" type="textarea" :rows="3" maxlength="2000" show-word-limit placeholder="补充经验、指出错误或提问" />
+          <div class="comment-actions">
+            <el-button type="primary" size="small" @click="submitWikiComment()">发布讨论</el-button>
+          </div>
+        </div>
+        <div v-else class="login-tip">
+          <router-link to="/login">登录后参与词条讨论</router-link>
+        </div>
+
+        <div v-for="c in wikiComments" :key="c.id" class="comment-item">
+          <div class="comment-main">
+            <img :src="c.authorAvatar || '/default-avatar.png'" class="comment-avatar" />
+            <div class="comment-body">
+              <div class="comment-meta">
+                <b>{{ c.authorName || '用户' + c.userId }}</b>
+                <span>{{ formatTime(c.createdAt) }}</span>
+              </div>
+              <p>{{ c.content }}</p>
+              <div class="comment-tools">
+                <el-button text size="small" @click="likeWikiComment(c)">👍 {{ c.likeCount || 0 }}</el-button>
+                <el-button v-if="userStore.isLoggedIn" text size="small" @click="replyTarget = replyTarget?.id === c.id ? null : c">回复</el-button>
+                <el-button v-if="userStore.isLoggedIn" text size="small" @click="reportWikiComment(c)">举报</el-button>
+                <el-button v-if="canDelete(c)" text size="small" type="danger" @click="deleteWikiComment(c)">删除</el-button>
+              </div>
+              <div v-if="replyTarget?.id === c.id" class="reply-editor">
+                <el-input v-model="replyContent" type="textarea" :rows="2" maxlength="2000" placeholder="回复这条讨论" />
+                <div class="comment-actions">
+                  <el-button size="small" @click="replyTarget = null; replyContent = ''">取消</el-button>
+                  <el-button type="primary" size="small" @click="submitWikiComment(c.id)">回复</el-button>
+                </div>
+              </div>
+
+              <div v-for="child in c.children || []" :key="child.id" class="comment-item child-comment">
+                <div class="comment-main">
+                  <img :src="child.authorAvatar || '/default-avatar.png'" class="comment-avatar small" />
+                  <div class="comment-body">
+                    <div class="comment-meta">
+                      <b>{{ child.authorName || '用户' + child.userId }}</b>
+                      <span>{{ formatTime(child.createdAt) }}</span>
+                    </div>
+                    <p>{{ child.content }}</p>
+                    <div class="comment-tools">
+                      <el-button text size="small" @click="likeWikiComment(child)">👍 {{ child.likeCount || 0 }}</el-button>
+                      <el-button v-if="userStore.isLoggedIn" text size="small" @click="reportWikiComment(child)">举报</el-button>
+                      <el-button v-if="canDelete(child)" text size="small" type="danger" @click="deleteWikiComment(child)">删除</el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <el-empty v-if="!wikiComments.length" description="暂无讨论" :image-size="40" />
       </div>
     </div>
 
@@ -109,8 +165,9 @@ import DOMPurify from 'dompurify'
 import request from '../api/request'
 
 const route = useRoute(), userStore = useUserStore()
-const entry = ref(null), histories = ref([]), relatedEntries = ref([])
+const entry = ref(null), histories = ref([]), relatedEntries = ref([]), wikiComments = ref([])
 const editing = ref(false), saving = ref(false), wikiUploading = ref(false), lastImgUrl = ref('')
+const commentContent = ref(''), replyContent = ref(''), replyTarget = ref(null)
 const editForm = ref({ title: '', category: '', content: '' })
 const renderedContent = computed(() => entry.value?.content ? DOMPurify.sanitize(marked(entry.value.content)) : '')
 
@@ -144,9 +201,55 @@ const submitEdit = async () => {
   saving.value = false
 }
 
+const loadWikiComments = async () => {
+  const r = await request.get(`/api/wiki/${route.params.id}/comments`)
+  if (r.code === 200) wikiComments.value = r.data || []
+}
+
+const submitWikiComment = async (parentId = null) => {
+  const content = parentId ? replyContent.value : commentContent.value
+  if (!content.trim()) return ElMessage.warning('评论内容不能为空')
+  const r = await request.post(`/api/wiki/${route.params.id}/comments`, { content, parentId })
+  if (r.code === 200) {
+    ElMessage.success(parentId ? '回复成功' : '评论成功')
+    commentContent.value = ''
+    replyContent.value = ''
+    replyTarget.value = null
+    loadWikiComments()
+  }
+}
+
+const likeWikiComment = async (comment) => {
+  if (!userStore.isLoggedIn) return ElMessage.warning('请先登录')
+  const r = await request.post('/api/likes', { targetId: comment.id, targetType: 'WIKI_COMMENT' })
+  if (r.code === 200) {
+    const liked = r.data === '点赞成功'
+    comment.likeCount = Math.max((comment.likeCount || 0) + (liked ? 1 : -1), 0)
+  }
+}
+
+const reportWikiComment = async (comment) => {
+  if (!userStore.isLoggedIn) return ElMessage.warning('请先登录')
+  const reason = window.prompt('请输入举报原因')
+  if (!reason || !reason.trim()) return
+  const r = await request.post('/api/reports', { targetId: comment.id, targetType: 'WIKI_COMMENT', reason })
+  if (r.code === 200) ElMessage.success('已提交举报')
+}
+
+const canDelete = (comment) => userStore.isLoggedIn && (userStore.isAdmin || comment.userId === userStore.userId)
+
+const deleteWikiComment = async (comment) => {
+  const r = await request.delete(`/api/wiki/comments/${comment.id}`)
+  if (r.code === 200) {
+    ElMessage.success('已删除')
+    loadWikiComments()
+  }
+}
+
 const loadEntry = async () => {
   const r = await request.get(`/api/wiki/${route.params.id}`); if (r.code === 200) entry.value = r.data
   const h = await request.get(`/api/wiki/${route.params.id}/history`); if (h.code === 200) histories.value = h.data || []
+  loadWikiComments()
   // Load related entries from same category
   if (entry.value?.category) {
     const re = await request.get('/api/wiki', { params: { category: entry.value.category, page: 1, size: 10 } })
@@ -167,7 +270,22 @@ onMounted(loadEntry)
 .wiki-content :deep(code) { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; font-size: 13px; }
 .wiki-content :deep(pre) { background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }
 .wiki-content :deep(img) { max-width: 100%; border-radius: 6px; margin: 8px 0; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.section-head h3 { font-size: 15px; margin: 0; }
+.comment-editor { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.comment-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.login-tip { padding: 10px; background: #f6fbff; border: 1px solid #d8eafa; border-radius: 6px; margin-bottom: 10px; font-size: 13px; }
 .comment-item { padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+.comment-main { display: flex; gap: 10px; align-items: flex-start; }
+.comment-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; background: #f5f5f5; }
+.comment-avatar.small { width: 28px; height: 28px; }
+.comment-body { flex: 1; min-width: 0; }
+.comment-body p { margin: 6px 0; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.comment-meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #8a98a8; }
+.comment-meta b { color: #334155; font-size: 13px; }
+.comment-tools { display: flex; gap: 4px; flex-wrap: wrap; }
+.reply-editor { margin-top: 8px; }
+.child-comment { margin-top: 8px; margin-left: 0; padding: 8px 0 0 0; border-top: 1px solid #eef3f8; border-bottom: 0; }
 .side-stat { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid #f5f5f5; }
 .side-stat:last-child { border-bottom: none; }
 .side-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }

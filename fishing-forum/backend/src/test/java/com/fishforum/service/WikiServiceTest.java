@@ -3,10 +3,14 @@ package com.fishforum.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fishforum.common.Result;
+import com.fishforum.entity.WikiComment;
 import com.fishforum.entity.User;
 import com.fishforum.entity.WikiEntry;
 import com.fishforum.entity.WikiHistory;
 import com.fishforum.mapper.UserMapper;
+import com.fishforum.mapper.LikeMapper;
+import com.fishforum.mapper.ReportMapper;
+import com.fishforum.mapper.WikiCommentMapper;
 import com.fishforum.mapper.WikiEntryMapper;
 import com.fishforum.mapper.WikiHistoryMapper;
 import org.junit.jupiter.api.Test;
@@ -27,7 +31,11 @@ class WikiServiceTest {
 
     @Mock WikiEntryMapper entryMapper;
     @Mock WikiHistoryMapper historyMapper;
+    @Mock WikiCommentMapper wikiCommentMapper;
     @Mock UserMapper userMapper;
+    @Mock LikeMapper likeMapper;
+    @Mock ReportMapper reportMapper;
+    @Mock SocialService socialService;
     @InjectMocks WikiService wikiService;
 
     @Test
@@ -111,6 +119,54 @@ class WikiServiceTest {
                 .contains("鱼种", "饵料", "装备", "技巧", "常识", "鱼种图鉴");
     }
 
+    @Test
+    void addWikiCommentCreatesIndependentDiscussionAndNotifiesEntryOwner() {
+        WikiEntry entry = entry(7L, 3L);
+        when(entryMapper.selectById(7L)).thenReturn(entry);
+
+        Result<?> result = wikiService.addComment(7L, "百科补充", null, 4L);
+
+        assertThat(result.getCode()).isEqualTo(200);
+        verify(wikiCommentMapper).insert(argThat(c ->
+                c.getEntryId().equals(7L)
+                        && c.getUserId().equals(4L)
+                        && c.getContent().equals("百科补充")
+                        && c.getParentId() == null));
+        verify(socialService).sendNotification(eq(3L), eq("WIKI_COMMENT"), anyString(), anyString(), eq(7L));
+    }
+
+    @Test
+    void replyWikiCommentNotifiesParentAuthor() {
+        WikiEntry entry = entry(7L, 3L);
+        WikiComment parent = wikiComment(9L, 7L, null, 5L);
+        when(entryMapper.selectById(7L)).thenReturn(entry);
+        when(wikiCommentMapper.selectById(9L)).thenReturn(parent);
+
+        Result<?> result = wikiService.addComment(7L, "回复百科评论", 9L, 4L);
+
+        assertThat(result.getCode()).isEqualTo(200);
+        verify(socialService).sendNotification(eq(5L), eq("WIKI_COMMENT_REPLY"), anyString(), anyString(), eq(7L));
+    }
+
+    @Test
+    void getWikiCommentsBuildsTreeAndEnrichesAuthors() {
+        WikiComment root = wikiComment(1L, 7L, null, 3L);
+        WikiComment child = wikiComment(2L, 7L, 1L, 4L);
+        when(wikiCommentMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(root, child));
+        User editor = new User(); editor.setId(3L); editor.setUsername("editor");
+        User replier = new User(); replier.setId(4L); replier.setUsername("replier");
+        when(userMapper.selectById(3L)).thenReturn(editor);
+        when(userMapper.selectById(4L)).thenReturn(replier);
+
+        Result<?> result = wikiService.getComments(7L);
+
+        List<?> comments = (List<?>) result.getData();
+        WikiComment returned = (WikiComment) comments.get(0);
+        assertThat(returned.getAuthorName()).isEqualTo("editor");
+        assertThat(returned.getChildren()).hasSize(1);
+        assertThat(returned.getChildren().get(0).getAuthorName()).isEqualTo("replier");
+    }
+
     private static WikiEntry entry(Long id, Long userId) {
         WikiEntry entry = new WikiEntry();
         entry.setId(id);
@@ -121,5 +177,16 @@ class WikiServiceTest {
         entry.setVersion(1);
         entry.setViewCount(0);
         return entry;
+    }
+
+    private static WikiComment wikiComment(Long id, Long entryId, Long parentId, Long userId) {
+        WikiComment comment = new WikiComment();
+        comment.setId(id);
+        comment.setEntryId(entryId);
+        comment.setParentId(parentId);
+        comment.setUserId(userId);
+        comment.setContent("content");
+        comment.setLikeCount(0);
+        return comment;
     }
 }

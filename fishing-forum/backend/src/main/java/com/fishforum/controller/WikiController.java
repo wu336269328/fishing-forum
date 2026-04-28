@@ -63,4 +63,26 @@ public class WikiController {
     public Result<?> getHistory(@PathVariable Long id) {
         return wikiService.getHistory(id);
     }
+
+    // 获取百科独立讨论（公开）
+    @GetMapping("/{id}/comments")
+    public Result<?> getComments(@PathVariable Long id) {
+        return wikiService.getComments(id);
+    }
+
+    // 发布百科评论
+    @PostMapping("/{id}/comments")
+    public Result<?> addComment(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body,
+            Authentication auth) {
+        String content = (String) body.get("content");
+        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : null;
+        return wikiService.addComment(id, content, parentId, (Long) auth.getPrincipal());
+    }
+
+    // 删除百科评论
+    @DeleteMapping("/comments/{commentId}")
+    public Result<?> deleteComment(@PathVariable Long commentId, Authentication auth) {
+        String role = auth.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
+        return wikiService.deleteComment(commentId, (Long) auth.getPrincipal(), role);
+    }
 }

@@ -82,6 +82,7 @@ public class SecurityConfig {
                                 "/api/wiki",
                                 "/api/wiki/categories",
                                 "/api/wiki/*",
+                                "/api/wiki/*/comments",
                                 "/api/wiki/*/history",
                                 "/api/announcements",
                                 "/api/users/*/profile",

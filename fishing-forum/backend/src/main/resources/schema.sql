@@ -178,6 +178,18 @@ CREATE TABLE IF NOT EXISTS wiki_histories (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 百科独立讨论表
+CREATE TABLE IF NOT EXISTS wiki_comments (
+    id BIGSERIAL PRIMARY KEY,
+    entry_id BIGINT NOT NULL REFERENCES wiki_entries(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    parent_id BIGINT DEFAULT NULL REFERENCES wiki_comments(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    like_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted INTEGER DEFAULT 0
+);
+
 -- 举报表
 CREATE TABLE IF NOT EXISTS reports (
     id BIGSERIAL PRIMARY KEY,
@@ -264,6 +276,8 @@ CREATE INDEX IF NOT EXISTS idx_catch_records_post ON catch_records(post_id);
 CREATE INDEX IF NOT EXISTS idx_gear_reviews_post ON gear_reviews(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_comments_entry ON wiki_comments(entry_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_comments_user ON wiki_comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);

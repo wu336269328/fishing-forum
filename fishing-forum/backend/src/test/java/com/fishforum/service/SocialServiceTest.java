@@ -79,6 +79,15 @@ class SocialServiceTest {
         assertThat(result.getMessage()).isEqualTo("发送成功");
         verify(messageMapper).insert(any(Message.class));
         verify(messagingTemplate).convertAndSendToUser(eq("4"), eq("/queue/messages"), any(Message.class));
+        verify(notificationMapper).insert(argThat(n -> n.getUserId().equals(4L) && "MESSAGE".equals(n.getType())));
+        verify(messagingTemplate).convertAndSendToUser(eq("4"), eq("/queue/notifications"), any(Notification.class));
+    }
+
+    @Test
+    void sendMessageRejectsBlankContentAndSelfMessage() {
+        assertThat(socialService.sendMessage(3L, "hello", 3L).getCode()).isEqualTo(400);
+        assertThat(socialService.sendMessage(4L, "  ", 3L).getCode()).isEqualTo(400);
+        verify(messageMapper, never()).insert(any(Message.class));
     }
 
     @Test

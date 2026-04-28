@@ -34,6 +34,7 @@ class AdminServiceTest {
     @Mock AnnouncementMapper announcementMapper;
     @Mock FishingSpotMapper spotMapper;
     @Mock WikiEntryMapper wikiMapper;
+    @Mock WikiCommentMapper wikiCommentMapper;
     @Mock AdminLogMapper adminLogMapper;
     @Mock SensitiveWordMapper sensitiveWordMapper;
     @InjectMocks AdminService adminService;
@@ -142,6 +143,20 @@ class AdminServiceTest {
         assertThat(commentReport.getStatus()).isEqualTo("REJECTED");
         assertThat(commentReport.getReviewNote()).isEqualTo("证据不足");
         verify(commentMapper, never()).deleteById(10L);
+    }
+
+    @Test
+    void handleReportResolvesAndDeletesReportedWikiComment() {
+        Report wikiCommentReport = report(12L, "WIKI_COMMENT");
+        when(reportMapper.selectById(3L)).thenReturn(wikiCommentReport);
+
+        Result<?> resolved = adminService.handleReport(99L, 3L, "resolve", "百科评论违规");
+
+        assertThat(resolved.getData()).isEqualTo("处理成功");
+        assertThat(wikiCommentReport.getStatus()).isEqualTo("RESOLVED");
+        verify(likeMapper).deleteByTarget("WIKI_COMMENT", 12L);
+        verify(reportMapper).deleteByTarget("WIKI_COMMENT", 12L);
+        verify(wikiCommentMapper).deleteById(12L);
     }
 
     @Test

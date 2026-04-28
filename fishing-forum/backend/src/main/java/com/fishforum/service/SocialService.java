@@ -9,6 +9,7 @@ import com.fishforum.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +33,7 @@ public class SocialService {
     // ========== 关注功能 ==========
 
     // 关注/取消关注
+    @Transactional
     public Result<?> toggleFollow(Long followingId, Long followerId) {
         if (followingId.equals(followerId))
             return Result.error("不能关注自己");
@@ -113,16 +115,24 @@ public class SocialService {
     // ========== 私信功能 ==========
 
     // 发送私信
+    @Transactional
     public Result<?> sendMessage(Long receiverId, String content, Long senderId) {
+        if (receiverId.equals(senderId)) {
+            return Result.error(400, "不能给自己发送私信");
+        }
+        if (content == null || content.trim().isEmpty()) {
+            return Result.error(400, "私信内容不能为空");
+        }
         Message msg = new Message();
         msg.setSenderId(senderId);
         msg.setReceiverId(receiverId);
-        msg.setContent(content);
+        msg.setContent(content.trim());
         msg.setIsRead(false);
         messageMapper.insert(msg);
         // 通过WebSocket推送
         messagingTemplate.convertAndSendToUser(
                 receiverId.toString(), "/queue/messages", msg);
+        sendNotification(receiverId, "MESSAGE", "收到新私信", "你收到了一条新私信", senderId);
         return Result.ok("发送成功", msg);
     }
 
@@ -211,6 +221,7 @@ public class SocialService {
     }
 
     // 标记通知已读
+    @Transactional
     public Result<?> markNotificationRead(Long id, Long userId) {
         Notification n = notificationMapper.selectById(id);
         if (n != null && n.getUserId().equals(userId)) {
@@ -221,6 +232,7 @@ public class SocialService {
     }
 
     // 全部标记已读
+    @Transactional
     public Result<?> markAllRead(Long userId) {
         notificationMapper.selectList(new LambdaQueryWrapper<Notification>()
                 .eq(Notification::getUserId, userId).eq(Notification::getIsRead, false))

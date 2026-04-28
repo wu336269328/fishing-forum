@@ -25,6 +25,7 @@ class InteractionServiceTest {
     @Mock PostMapper postMapper;
     @Mock UserMapper userMapper;
     @Mock ReportMapper reportMapper;
+    @Mock WikiCommentMapper wikiCommentMapper;
     @Mock SocialService socialService;
     @InjectMocks InteractionService interactionService;
 
@@ -114,6 +115,10 @@ class InteractionServiceTest {
 
     @Test
     void favoriteAndReportCreateRows() {
+        Post post = new Post();
+        post.setId(7L);
+        post.setUserId(9L);
+        when(postMapper.selectById(7L)).thenReturn(post);
         when(favoriteMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         Result<?> fav = interactionService.toggleFavorite(7L, 3L);
@@ -123,6 +128,30 @@ class InteractionServiceTest {
         assertThat(report.getCode()).isEqualTo(200);
         verify(favoriteMapper).insert(any(Favorite.class));
         verify(reportMapper).insert(any(Report.class));
+        verify(socialService).sendNotification(eq(9L), eq("FAVORITE"), anyString(), anyString(), eq(7L));
+    }
+
+    @Test
+    void commentLikeAndReportUseCommentTargetAndNotifyAuthor() {
+        Comment comment = comment(12L, null, 8L);
+        when(likeMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(commentMapper.selectById(12L)).thenReturn(comment);
+
+        Result<?> like = interactionService.toggleLike(12L, "COMMENT", 3L);
+        Result<?> report = interactionService.report(12L, "COMMENT", "攻击性内容", 3L);
+
+        assertThat(like.getData()).isEqualTo("点赞成功");
+        assertThat(report.getCode()).isEqualTo(200);
+        verify(commentMapper).incrementLikeCount(12L, 1);
+        verify(reportMapper).insert(argThat(r -> "COMMENT".equals(r.getTargetType()) && r.getTargetId().equals(12L)));
+        verify(socialService).sendNotification(eq(8L), eq("LIKE"), anyString(), anyString(), eq(7L));
+    }
+
+    @Test
+    void reportRejectsBlankReasonAndUnsupportedTargets() {
+        assertThat(interactionService.report(7L, "POST", " ", 3L).getCode()).isEqualTo(400);
+        assertThat(interactionService.report(7L, "UNKNOWN", "违规", 3L).getCode()).isEqualTo(400);
+        verify(reportMapper, never()).insert(any(Report.class));
     }
 
     private static Comment comment(Long id, Long parentId, Long userId) {

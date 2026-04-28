@@ -30,6 +30,7 @@ public class InteractionService {
     private final PostMapper postMapper;
     private final UserMapper userMapper;
     private final ReportMapper reportMapper;
+    private final WikiCommentMapper wikiCommentMapper;
     private final SocialService socialService;
 
     private static final Pattern MENTION_PATTERN = Pattern.compile("@([\\p{IsHan}\\w-]{2,20})");
@@ -173,6 +174,12 @@ public class InteractionService {
                 socialService.sendNotification(comment.getUserId(), "LIKE", "评论被点赞",
                         "你的评论收到了新的点赞", comment.getPostId());
             }
+        } else if ("WIKI_COMMENT".equals(targetType)) {
+            WikiComment comment = wikiCommentMapper.selectById(targetId);
+            if (comment != null && !comment.getUserId().equals(actorId)) {
+                socialService.sendNotification(comment.getUserId(), "LIKE", "百科评论被点赞",
+                        "你的百科评论收到了新的点赞", comment.getEntryId());
+            }
         }
     }
 
@@ -191,6 +198,11 @@ public class InteractionService {
             fav.setUserId(userId);
             fav.setPostId(postId);
             favoriteMapper.insert(fav);
+            Post post = postMapper.selectById(postId);
+            if (post != null && !post.getUserId().equals(userId)) {
+                socialService.sendNotification(post.getUserId(), "FAVORITE", "帖子被收藏",
+                        "你的帖子被用户收藏", postId);
+            }
             return Result.ok("收藏成功");
         }
     }
@@ -209,11 +221,17 @@ public class InteractionService {
     // 举报
     @Transactional
     public Result<?> report(Long targetId, String targetType, String reason, Long userId) {
+        if (reason == null || reason.trim().isEmpty()) {
+            return Result.error(400, "举报原因不能为空");
+        }
+        if (!Set.of("POST", "COMMENT", "USER", "WIKI_COMMENT").contains(targetType)) {
+            return Result.error(400, "不支持的举报类型");
+        }
         Report report = new Report();
         report.setReporterId(userId);
         report.setTargetId(targetId);
         report.setTargetType(targetType);
-        report.setReason(reason);
+        report.setReason(reason.trim());
         report.setStatus("PENDING");
         reportMapper.insert(report);
         return Result.ok("举报成功，管理员将尽快处理");
@@ -230,6 +248,11 @@ public class InteractionService {
             Comment c = commentMapper.selectById(targetId);
             if (c != null) {
                 commentMapper.incrementLikeCount(targetId, delta);
+            }
+        } else if ("WIKI_COMMENT".equals(type)) {
+            WikiComment c = wikiCommentMapper.selectById(targetId);
+            if (c != null) {
+                wikiCommentMapper.incrementLikeCount(targetId, delta);
             }
         }
     }

@@ -35,6 +35,7 @@ public class AdminService {
     private final AnnouncementMapper announcementMapper;
     private final FishingSpotMapper spotMapper;
     private final WikiEntryMapper wikiMapper;
+    private final WikiCommentMapper wikiCommentMapper;
     private final AdminLogMapper adminLogMapper;
     private final SensitiveWordMapper sensitiveWordMapper;
 
@@ -157,6 +158,8 @@ public class AdminService {
                 deletePostCascade(report.getTargetId());
             else if ("COMMENT".equals(report.getTargetType()))
                 deleteCommentCascade(report.getTargetId());
+            else if ("WIKI_COMMENT".equals(report.getTargetType()))
+                deleteWikiCommentCascade(report.getTargetId());
         } else {
             report.setStatus("REJECTED");
         }
@@ -281,5 +284,11 @@ public class AdminService {
         if (comment != null) {
             postMapper.incrementCommentCount(comment.getPostId(), -1);
         }
+    }
+
+    private void deleteWikiCommentCascade(Long commentId) {
+        likeMapper.deleteByTarget("WIKI_COMMENT", commentId);
+        reportMapper.deleteByTarget("WIKI_COMMENT", commentId);
+        wikiCommentMapper.deleteById(commentId);
     }
 }
