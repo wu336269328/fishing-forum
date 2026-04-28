@@ -6,7 +6,7 @@
         <h1 class="hero-title">找钓点、聊装备、晒渔获。</h1>
         <p class="hero-subtitle">把每一次出钓经验沉淀成可搜索、可讨论、可复用的社区内容。</p>
       </div>
-      <router-link :to="{ path: '/post/create', query: { postType: 'CATCH' } }"><el-button size="large" round>发布渔获</el-button></router-link>
+      <router-link class="hero-action" :to="{ path: '/post/create', query: { postType: 'CATCH' } }"><el-button size="large" round>发布渔获</el-button></router-link>
     </section>
     <!-- 公告 -->
     <div v-if="announcements.length" class="card" style="background:#fffbe6; border-color:#ffe58f">
@@ -146,6 +146,7 @@ onMounted(async () => {
 
 <style scoped>
 .home-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.hero-action { position: relative; z-index: 1; flex-shrink: 0; }
 .eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
 .home-grid { align-items: start; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
