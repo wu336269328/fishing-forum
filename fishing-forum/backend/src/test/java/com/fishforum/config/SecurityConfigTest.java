@@ -50,6 +50,7 @@ class SecurityConfigTest {
                 "/api/wiki/1",
                 "/api/wiki/categories",
                 "/api/wiki/1/history",
+                "/api/wiki/1/comments",
                 "/api/announcements",
                 "/api/users/1/profile",
                 "/api/follows/check/2",
@@ -109,6 +110,24 @@ class SecurityConfigTest {
     }
 
     @Test
+    void staleBearerTokenDoesNotBreakPublicSpotAndWikiBrowsing() throws Exception {
+        when(jwtUtil.validateToken("expired")).thenReturn(false);
+
+        for (String path : new String[] {
+                "/api/spots",
+                "/api/spots/1",
+                "/api/spots/1/reviews",
+                "/api/wiki",
+                "/api/wiki/1",
+                "/api/wiki/1/history",
+                "/api/wiki/1/comments"
+        }) {
+            mockMvc.perform(get(path).header("Authorization", "Bearer expired"))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
     void invalidBearerTokenReturnsUnauthorizedNotForbidden() throws Exception {
         when(jwtUtil.validateToken("expired")).thenReturn(false);
 
@@ -136,8 +155,8 @@ class SecurityConfigTest {
         @GetMapping({"/api/posts", "/api/posts/1", "/api/comments/1", "/api/sections", "/api/tags",
                 "/api/tags/hot", "/api/statistics/public", "/api/weather", "/api/spots", "/api/spots/all",
                 "/api/spots/1", "/api/spots/1/reviews", "/api/wiki", "/api/wiki/1", "/api/wiki/categories",
-                "/api/wiki/1/history", "/api/announcements", "/api/users/1/profile", "/api/follows/check/2",
-                "/api/notifications/unread-count", "/api/uploads/images/example.jpg"})
+                "/api/wiki/1/history", "/api/wiki/1/comments", "/api/announcements", "/api/users/1/profile",
+                "/api/follows/check/2", "/api/notifications/unread-count", "/api/uploads/images/example.jpg"})
         String publicEndpoint() {
             return "public";
         }

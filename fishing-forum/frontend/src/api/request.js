@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { shouldAttachAuth, shouldRedirectToLogin } from './requestPolicy'
 
 /**
  * Axios请求实例 - 自动附加JWT令牌和错误处理
@@ -12,7 +13,7 @@ const request = axios.create({
 // 请求拦截器 - 添加JWT令牌
 request.interceptors.request.use(config => {
     const token = localStorage.getItem('token')
-    if (token) {
+    if (token && shouldAttachAuth(config)) {
         config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -24,12 +25,14 @@ request.interceptors.response.use(
     error => {
         if (error.response) {
             const { status } = error.response
-            if (status === 401) {
+            if (shouldRedirectToLogin(status, error.config)) {
                 // 令牌过期，清除登录状态
                 localStorage.removeItem('token')
                 localStorage.removeItem('user')
                 ElMessage.error('登录已过期，请重新登录')
                 window.location.href = '/login'
+            } else if (status === 401) {
+                ElMessage.error('内容加载失败，请刷新重试')
             } else if (status === 403) {
                 ElMessage.error(localStorage.getItem('token') ? '没有权限执行此操作' : '请先登录后再执行此操作')
             } else {
