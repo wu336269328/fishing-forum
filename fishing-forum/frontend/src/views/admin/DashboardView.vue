@@ -18,18 +18,22 @@
         <div class="text-muted">{{ s.label }}</div>
       </div>
     </div>
-    <div class="card admin-note">
-      <h3>待优化运营动作</h3>
-      <p>优先处理举报、异常用户、封禁禁言和敏感词维护。所有关键后台操作会写入操作日志。</p>
-    </div>
-    <div class="card">
-      <h3 style="font-size:16px;margin-bottom:10px">最近操作日志</h3>
-      <div v-for="log in logs" :key="log.id" class="log-row">
-        <span>{{ log.action }}</span>
-        <b>{{ log.targetType }} #{{ log.targetId || '-' }}</b>
-        <em>{{ log.detail }}</em>
+    <div class="admin-dashboard-grid">
+      <div class="card admin-note admin-workbench-card">
+        <h3>运营待办</h3>
+        <p>优先处理举报、异常用户、封禁禁言和敏感词维护。所有关键后台操作会写入操作日志。</p>
+        <router-link to="/admin/audit" class="admin-action-link">进入审核队列</router-link>
+        <router-link to="/admin/users" class="admin-action-link">用户治理</router-link>
       </div>
-      <el-empty v-if="!logs.length" description="暂无日志" :image-size="40" />
+      <div class="card admin-log-card">
+        <h3 style="font-size:16px;margin-bottom:10px">最近操作日志</h3>
+        <div v-for="log in logs" :key="log.id" class="log-row">
+          <span>{{ log.action }}</span>
+          <b>{{ log.targetType }} #{{ log.targetId || '-' }}</b>
+          <em>{{ log.detail }}</em>
+        </div>
+        <el-empty v-if="!logs.length" description="暂无日志" :image-size="40" />
+      </div>
     </div>
   </div>
 </template>
@@ -57,12 +61,16 @@ onMounted(async () => {
 .admin-nav { display: flex; gap: 12px; margin-bottom: 16px; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.72); font-size: 14px; overflow-x: auto; }
 .admin-nav a { color: #555; text-decoration: none; }
 .admin-nav a:hover, .admin-nav a.router-link-exact-active { color: #1a73e8; }
-.admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+.admin-grid { display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); gap:12px; margin-bottom:20px; }
 .admin-stat { text-align:center; }
 .admin-value { font-size: 28px; font-weight: 900; color: var(--blue); }
+.admin-dashboard-grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.admin-workbench-card { align-content: start; }
 .admin-note h3 { font-size: 16px; margin-bottom: 6px; }
 .admin-note p { color: var(--muted); font-size: 13px; }
+.admin-action-link { display: block; margin-top: 10px; padding: 9px 10px; border-radius: 12px; background: var(--green-soft); color: var(--green-dark); font-size: 13px; font-weight: 700; }
 .log-row { display:grid; grid-template-columns:140px 120px 1fr; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
 .log-row em { color: var(--muted); font-style: normal; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:1200px){ .admin-grid{grid-template-columns:repeat(3,minmax(0,1fr))} .admin-dashboard-grid{grid-template-columns:1fr} }
 @media (max-width:768px){ .log-row{grid-template-columns:1fr} }
 </style>

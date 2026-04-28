@@ -131,6 +131,15 @@
       <template #footer><el-button @click="showReport=false">取消</el-button><el-button type="primary" @click="submitReport">提交</el-button></template>
     </el-dialog>
   </div>
+  <div v-else-if="loadError" class="page-shell">
+    <div class="card desktop-error-card">
+      <div>
+        <b>帖子加载失败</b>
+        <p class="text-muted">当前无法获取帖子内容，请检查后端服务或稍后重试。</p>
+      </div>
+      <el-button size="small" type="primary" @click="loadPostDetail">重新加载</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -143,6 +152,7 @@ import DOMPurify from 'dompurify'
 
 const route = useRoute(), router = useRouter(), userStore = useUserStore()
 const post = ref(null), comments = ref([]), commentContent = ref(''), replyContent = ref(''), replyTarget = ref(null), showReport = ref(false), reportReason = ref('')
+const loadError = ref(false)
 const catchRecord = ref(null), gearReview = ref(null), hotPosts = ref([])
 const isOwner = computed(() => post.value && userStore.userId === post.value.userId)
 const isAdmin = computed(() => userStore.isAdmin)
@@ -169,6 +179,7 @@ const loadHotPosts = async (postId) => {
 
 const loadPostDetail = async () => {
   const postId = route.params.id
+  loadError.value = false
   post.value = null
   comments.value = []
   catchRecord.value = null
@@ -179,14 +190,18 @@ const loadPostDetail = async () => {
   showReport.value = false
   reportReason.value = ''
 
-  const r = await request.get(`/api/posts/${postId}`)
-  if (r.code === 200) {
-    post.value = r.data.post || r.data
-    catchRecord.value = r.data.catchRecord || null
-    gearReview.value = r.data.gearReview || null
+  try {
+    const r = await request.get(`/api/posts/${postId}`)
+    if (r.code === 200) {
+      post.value = r.data.post || r.data
+      catchRecord.value = r.data.catchRecord || null
+      gearReview.value = r.data.gearReview || null
+    }
+    await loadComments(postId)
+    await loadHotPosts(postId)
+  } catch (e) {
+    loadError.value = true
   }
-  await loadComments(postId)
-  await loadHotPosts(postId)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 

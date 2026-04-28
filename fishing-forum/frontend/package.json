@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:pc-ui": "node tests/pcUi.test.mjs",
     "test:mobile-ui": "node tests/mobileUi.test.mjs",
     "test:post-type": "node tests/postType.test.mjs",
     "test:request": "node tests/requestPolicy.test.mjs && node tests/requestErrorMessage.test.mjs",

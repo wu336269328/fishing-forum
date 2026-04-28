@@ -2,7 +2,7 @@
   <header class="header">
     <div class="header-inner">
       <router-link to="/" class="logo">
-        <span class="logo-mark">🎣</span>
+        <span class="logo-mark logo-hook">钓</span>
         <span><b>钓友圈</b><small>Fishing Forum</small></span>
       </router-link>
       <nav class="nav desktop-nav">
@@ -16,11 +16,12 @@
       <div class="actions">
         <template v-if="userStore.isLoggedIn">
           <router-link to="/post/create"><el-button type="primary" size="small" round>发帖</el-button></router-link>
-          <router-link to="/notifications" class="icon-link" title="通知">🔔<span v-if="unread" class="badge">{{ unread }}</span></router-link>
-          <router-link to="/messages" class="icon-link" title="私信">✉️</router-link>
+          <router-link to="/notifications" class="icon-link header-icon" title="通知">通知<span v-if="unread" class="badge">{{ unread }}</span></router-link>
+          <router-link to="/messages" class="icon-link header-icon" title="私信">私信</router-link>
           <el-dropdown trigger="click">
             <div class="user-trigger">
-              <img :src="userStore.user?.avatar || '/default-avatar.png'" class="avatar-sm" />
+              <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="avatar-sm" />
+              <span v-else class="user-avatar-fallback">{{ userInitial }}</span>
               <span class="user-name">{{ userStore.user?.username }}</span>
             </div>
             <template #dropdown>
@@ -59,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { useViewModeStore } from '../../stores/viewMode'
@@ -69,6 +70,7 @@ const router = useRouter(), userStore = useUserStore()
 const unread = ref(0)
 const mobileMenuOpen = ref(false)
 const viewMode = useViewModeStore()
+const userInitial = computed(() => (userStore.user?.username || '钓').slice(0, 1).toUpperCase())
 const viewOptions = [
   { label: '自动', value: 'auto' },
   { label: 'PC', value: 'desktop' },
@@ -102,16 +104,18 @@ onMounted(async () => {
 .header { background: rgba(255,255,255,0.92); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(14px); }
 .header-inner { max-width: 1440px; margin: 0 auto; padding: 0 24px; min-height: 64px; display: flex; align-items: center; gap: 18px; }
 .logo { font-size: 16px; color: var(--ink); text-decoration: none; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
-.logo-mark { width: 36px; height: 36px; border-radius: 14px; background: linear-gradient(135deg, #365f93, #4f7fbf); color: #fff; display: grid; place-items: center; box-shadow: var(--shadow-soft); }
+.logo-mark { width: 36px; height: 36px; border-radius: 14px; background: linear-gradient(135deg, #365f93, #4f7fbf); color: #fff; display: grid; place-items: center; box-shadow: var(--shadow-soft); font-weight: 900; }
 .logo small { display: block; font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; line-height: 1.1; }
 .nav { display: flex; gap: 6px; flex: 1; }
 .nav a { color: #4b5563; font-size: 14px; text-decoration: none; padding: 8px 12px; border-radius: 999px; }
 .nav a:hover, .nav a.router-link-active { color: var(--green); background: var(--green-soft); }
 .actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; font-size: 14px; }
 .icon-link { position: relative; text-decoration: none; font-size: 16px; }
+.header-icon { min-width: 34px; min-height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--green-soft); color: var(--green-dark); font-size: 12px; font-weight: 700; }
 .badge { position: absolute; top: -6px; right: -8px; background: #e74c3c; color: #fff; font-size: 10px; padding: 0 4px; border-radius: 8px; line-height: 16px; }
 .user-trigger { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .user-name { font-size: 14px; color: #333; }
+.user-avatar-fallback { width: 32px; height: 32px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--green); color: #fff; font-size: 13px; font-weight: 800; border: 2px solid rgba(255,255,255,.9); }
 .view-switch { flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.82); }
 .view-switch button { border: 0; background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 9px; font-size: 12px; cursor: pointer; }
 .view-switch button.active { background: var(--green); color: #fff; font-weight: 700; }

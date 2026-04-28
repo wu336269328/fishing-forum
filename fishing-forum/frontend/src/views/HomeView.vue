@@ -53,7 +53,16 @@
             <span>👍 {{ post.likeCount }}</span>
           </div>
         </div>
-        <el-empty v-if="!posts.length" description="暂无帖子，快来发第一帖吧！" />
+        <div v-if="loadError" class="card desktop-error-card">
+          <div>
+            <b>内容加载失败</b>
+            <p class="text-muted">后端暂时不可用，刷新或稍后重试。</p>
+          </div>
+          <el-button size="small" type="primary" @click="retryHomeData">重新加载</el-button>
+        </div>
+        <div v-else-if="!posts.length" class="card desktop-empty-card">
+          <el-empty description="暂无帖子，快来发第一帖吧！" />
+        </div>
       </div>
 
       <!-- 侧边栏 -->
@@ -117,6 +126,7 @@ import request from '../api/request'
 
 const posts = ref([]), sections = ref([]), announcements = ref([]), stats = ref({})
 const activeUsers = ref([]), hotPosts = ref([]), hotTags = ref([])
+const loadError = ref(false)
 
 const formatTime = (t) => {
   if (!t) return ''
@@ -143,24 +153,30 @@ const catchHint = (post) => {
 }
 const isHot = (post) => (post.viewCount || 0) >= 200 || (post.likeCount || 0) >= 20
 
-onMounted(async () => {
-  const [p, s, a, hp, ht] = await Promise.all([
+const loadHomeData = async () => {
+  loadError.value = false
+  const [p, s, a, hp, ht] = await Promise.allSettled([
     request.get('/api/posts', { params: { page: 1, size: 10 } }),
     request.get('/api/sections'),
     request.get('/api/announcements'),
     request.get('/api/posts/hot', { params: { limit: 5 } }),
     request.get('/api/tags/hot', { params: { limit: 15 } })
   ])
-  if (p.code === 200) posts.value = p.data.records || []
-  if (s.code === 200) sections.value = s.data || []
-  if (a.code === 200) announcements.value = (a.data || []).filter(x => x.isActive)
-  if (hp.code === 200) hotPosts.value = hp.data || []
-  if (ht.code === 200) hotTags.value = ht.data || []
-  // 获取统计数据（使用公开接口）
+  const valueOf = (result) => result.status === 'fulfilled' ? result.value : null
+  const postResult = valueOf(p), sectionResult = valueOf(s), announcementResult = valueOf(a), hotResult = valueOf(hp), tagResult = valueOf(ht)
+  loadError.value = [p, s, a, hp, ht].some(result => result.status === 'rejected')
+  if (postResult?.code === 200) posts.value = postResult.data.records || []
+  if (sectionResult?.code === 200) sections.value = sectionResult.data || []
+  if (announcementResult?.code === 200) announcements.value = (announcementResult.data || []).filter(x => x.isActive)
+  if (hotResult?.code === 200) hotPosts.value = hotResult.data || []
+  if (tagResult?.code === 200) hotTags.value = tagResult.data || []
   try { const r = await request.get('/api/statistics/public'); if (r.code === 200) stats.value = r.data } catch (e) {
     stats.value = { postCount: posts.value.length, userCount: '-', spotCount: '-', wikiCount: '-' }
   }
-})
+}
+const retryHomeData = loadHomeData
+
+onMounted(loadHomeData)
 </script>
 
 <style scoped>

@@ -126,6 +126,15 @@
       </div>
     </el-dialog>
   </div>
+  <div v-else-if="loadError" class="page-shell">
+    <div class="card desktop-error-card">
+      <div>
+        <b>个人中心加载失败</b>
+        <p class="text-muted">当前无法获取用户资料，请检查后端服务或稍后重试。</p>
+      </div>
+      <el-button size="small" type="primary" @click="load">重新加载</el-button>
+    </div>
+  </div>
   <div v-else class="card" style="text-align:center; padding:40px">
     <p style="font-size:15px; color:#666; margin-bottom:12px">请先登录查看个人中心</p>
     <router-link to="/login"><el-button type="primary">去登录</el-button></router-link>
@@ -141,6 +150,7 @@ import request from '../api/request'
 
 const route = useRoute(), router = useRouter(), userStore = useUserStore()
 const profile = ref(null), userPosts = ref([]), favorites = ref([]), isFollowing = ref(false)
+const loadError = ref(false)
 const growth = ref({})
 const editForm = ref({ bio: '', email: '' })
 const pwForm = ref({ oldPassword: '', newPassword: '' })
@@ -152,12 +162,17 @@ const chatDialogVisible = ref(false), chatMessages = ref([]), chatInput = ref(''
 const isOwn = computed(() => { const id = route.params.id ? Number(route.params.id) : userStore.userId; return id === userStore.userId })
 
 const load = async () => {
+  loadError.value = false
   const id = route.params.id || userStore.userId
   if (!id) { profile.value = null; return }
   activeTab.value = 'posts'
-  const r = await request.get(`/api/users/${id}/profile`); if (r.code === 200) { profile.value = r.data; editForm.value = { bio: r.data.bio || '', email: r.data.email || '' } }
-  const p = await request.get(`/api/users/${id}/posts`, { params: { page: 1, size: 20 } }); if (p.code === 200) userPosts.value = p.data.records || p.data || []
-  if (!isOwn.value && userStore.isLoggedIn) { try { const f = await request.get(`/api/follows/check/${id}`); if (f.code === 200) isFollowing.value = f.data } catch (e) { } }
+  try {
+    const r = await request.get(`/api/users/${id}/profile`); if (r.code === 200) { profile.value = r.data; editForm.value = { bio: r.data.bio || '', email: r.data.email || '' } }
+    const p = await request.get(`/api/users/${id}/posts`, { params: { page: 1, size: 20 } }); if (p.code === 200) userPosts.value = p.data.records || p.data || []
+    if (!isOwn.value && userStore.isLoggedIn) { try { const f = await request.get(`/api/follows/check/${id}`); if (f.code === 200) isFollowing.value = f.data } catch (e) { } }
+  } catch (e) {
+    loadError.value = true
+  }
 }
 
 const loadFavorites = async () => {

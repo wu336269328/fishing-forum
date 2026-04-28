@@ -5,7 +5,8 @@
       <h1 class="hero-title">写下这次出钓的关键经验。</h1>
       <p class="hero-subtitle">标题说清楚问题，图片补足细节，标签让更多钓友找到它。</p>
     </section>
-    <div class="card">
+    <div class="create-workbench">
+    <div class="card create-editor-card">
       <el-form label-position="top">
         <!-- 帖子类型 -->
         <el-form-item label="帖子类型">
@@ -87,6 +88,14 @@
           <el-button type="primary" @click="handleSubmit" :loading="loading">发布</el-button>
         </div>
       </el-form>
+    </div>
+    <aside class="card publish-aside">
+      <h3>发布检查</h3>
+      <div class="publish-check" :class="{ done: form.sectionId }">选择板块</div>
+      <div class="publish-check" :class="{ done: form.title.length >= 5 }">标题至少 5 字</div>
+      <div class="publish-check" :class="{ done: form.content || images.length }">正文或图片</div>
+      <p class="text-muted">PC 版将发布设置固定在右侧，避免长表单滚动时丢失上下文。</p>
+    </aside>
     </div>
   </div>
 </template>
@@ -199,7 +208,15 @@ onMounted(async () => {
 
 <style scoped>
 .eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
-.create-page { max-width: 920px; margin: 0 auto; }
+.create-page { max-width: 1240px; margin: 0 auto; }
+.create-workbench { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.create-editor-card { min-width: 0; }
+.publish-aside { position: sticky; top: 82px; }
+.publish-aside h3 { font-size: 16px; margin-bottom: 10px; }
+.publish-check { padding: 9px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.publish-check::before { content: "○"; margin-right: 6px; color: #94a3b8; }
+.publish-check.done { color: var(--green-dark); font-weight: 700; }
+.publish-check.done::before { content: "✓"; color: var(--green); }
 .sub-form { background: #f9fafb; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #e5e7eb; }
 .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: 88px; background: rgba(255,253,248,.88); padding-top: 10px; }
@@ -210,6 +227,8 @@ onMounted(async () => {
 .img-upload-btn:hover { border-color: #1a73e8; color: #1a73e8; }
 .img-upload-btn.disabled { cursor: not-allowed; opacity: 0.5; }
 @media (max-width: 768px) {
+  .create-workbench { grid-template-columns: 1fr; }
+  .publish-aside { display: none; }
   .sub-grid { grid-template-columns: 1fr; }
   .form-actions { justify-content: stretch; }
   .form-actions .el-button { flex: 1; }

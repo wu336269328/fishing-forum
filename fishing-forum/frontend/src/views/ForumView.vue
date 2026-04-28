@@ -27,34 +27,54 @@
               :effect="selectedTag===tag.id?'dark':'plain'" :color="tag.id && selectedTag===tag.id ? tag.color : ''"
               @click="selectedTag=tag.id" style="cursor:pointer; margin:1px">{{ tag.name }}</el-tag>
     </div>
-    <!-- 帖子 -->
-    <div v-for="post in posts" :key="post.id" class="card post-item list-card" @click="$router.push(`/post/${post.id}`)">
-      <div class="card-header">
-        <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
-        <div>
-          <span class="text-link" @click.stop="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
-          <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
+    <div class="forum-layout">
+      <div class="forum-main">
+        <!-- 帖子 -->
+        <div v-for="post in posts" :key="post.id" class="card post-item list-card" @click="$router.push(`/post/${post.id}`)">
+          <div class="card-header">
+            <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
+            <div>
+              <span class="text-link" @click.stop="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
+              <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
+            </div>
+            <div class="post-tags">
+              <el-tag v-if="post.postType==='CATCH'" size="small" type="success">渔获</el-tag>
+              <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning">测评</el-tag>
+              <el-tag v-if="post.isTop" size="small" type="danger">置顶</el-tag>
+              <el-tag v-if="post.isFeatured" size="small" type="warning">精华</el-tag>
+              <el-tag v-if="post.tagName" size="small" effect="plain">{{ post.tagName }}</el-tag>
+              <el-tag size="small" effect="plain">{{ post.sectionName }}</el-tag>
+            </div>
+          </div>
+          <div class="post-title">{{ post.title }}</div>
+          <div class="post-excerpt">{{ stripHtml(post.content) }}</div>
+          <div class="post-meta">
+            <span>浏览 {{ post.viewCount }}</span>
+            <span>评论 {{ post.commentCount }}</span>
+            <span>点赞 {{ post.likeCount }}</span>
+          </div>
         </div>
-        <div class="post-tags">
-          <el-tag v-if="post.postType==='CATCH'" size="small" type="success">🐟 渔获</el-tag>
-          <el-tag v-if="post.postType==='REVIEW'" size="small" type="warning">⭐ 测评</el-tag>
-          <el-tag v-if="post.isTop" size="small" type="danger">置顶</el-tag>
-          <el-tag v-if="post.isFeatured" size="small" type="warning">精华</el-tag>
-          <el-tag v-if="post.tagName" size="small" effect="plain">{{ post.tagName }}</el-tag>
-          <el-tag size="small" effect="plain">{{ post.sectionName }}</el-tag>
+        <div v-if="loadError" class="card desktop-error-card">
+          <div>
+            <b>帖子加载失败</b>
+            <p class="text-muted">后端暂时不可用，检查服务后重试。</p>
+          </div>
+          <el-button size="small" type="primary" @click="loadPosts">重新加载</el-button>
+        </div>
+        <div v-else-if="!posts.length" class="card desktop-empty-card">
+          <el-empty description="暂无帖子" />
+        </div>
+        <div class="pagination-wrap" v-if="total>10">
+          <el-pagination background layout="prev,pager,next" :total="total" :page-size="10" v-model:current-page="currentPage" @current-change="loadPosts" />
         </div>
       </div>
-      <div class="post-title">{{ post.title }}</div>
-      <div class="post-excerpt">{{ stripHtml(post.content) }}</div>
-      <div class="post-meta">
-        <span>👁 {{ post.viewCount }}</span>
-        <span>💬 {{ post.commentCount }}</span>
-        <span>👍 {{ post.likeCount }}</span>
+      <div class="forum-aside card">
+        <h3>论坛导航</h3>
+        <p class="text-muted">PC 版优先使用搜索、排序和板块组合筛选。</p>
+        <router-link to="/post/create" class="quick-link">发表帖子</router-link>
+        <router-link to="/forum?postType=CATCH" class="quick-link">渔获日记</router-link>
+        <router-link to="/forum?postType=REVIEW" class="quick-link">装备测评</router-link>
       </div>
-    </div>
-    <el-empty v-if="!posts.length" description="暂无帖子" />
-    <div class="pagination-wrap" v-if="total>10">
-      <el-pagination background layout="prev,pager,next" :total="total" :page-size="10" v-model:current-page="currentPage" @current-change="loadPosts" />
     </div>
   </div>
 </template>
@@ -70,6 +90,7 @@ const userStore = useUserStore()
 const posts = ref([]), sections = ref([]), tags = ref([])
 const selectedSection = ref(null), selectedTag = ref(null), selectedType = ref('')
 const keyword = ref(''), sortBy = ref('latest'), currentPage = ref(1), total = ref(0)
+const loadError = ref(false)
 
 const postTypes = [
   { value: '', label: '全部', icon: '📋' },
@@ -83,22 +104,32 @@ const formatTime = (t) => { if (!t) return ''; const d=new Date(t),now=new Date(
 const stripHtml = (h) => h ? h.replace(/<[^>]+>/g,'').substring(0,120) : ''
 
 const loadPosts = async () => {
+  loadError.value = false
   if (selectedType.value === 'FOLLOWING') {
     if (!userStore.isLoggedIn) { posts.value = []; total.value = 0; return }
-    const feed = await request.get('/api/follows/feed', { params: { page: currentPage.value, size: 10 } })
-    if (feed.code === 200) { posts.value = feed.data.records || []; total.value = feed.data.total || 0 }
+    try {
+      const feed = await request.get('/api/follows/feed', { params: { page: currentPage.value, size: 10 } })
+      if (feed.code === 200) { posts.value = feed.data.records || []; total.value = feed.data.total || 0 }
+    } catch (e) { loadError.value = true }
     return
   }
   const params = { page: currentPage.value, size: 10, sectionId: selectedSection.value, keyword: keyword.value, sort: sortBy.value }
   if (selectedType.value) params.postType = selectedType.value
   if (selectedTag.value) params.tagId = selectedTag.value
-  const res = await request.get('/api/posts', { params })
-  if (res.code === 200) { posts.value = res.data.records || []; total.value = res.data.total || 0 }
+  try {
+    const res = await request.get('/api/posts', { params })
+    if (res.code === 200) { posts.value = res.data.records || []; total.value = res.data.total || 0 }
+  } catch (e) { loadError.value = true }
 }
 const loadTags = async () => {
   const params = selectedSection.value ? { sectionId: selectedSection.value } : {}
-  const r = await request.get('/api/tags', { params })
-  if (r.code === 200) tags.value = r.data || []
+  try {
+    const r = await request.get('/api/tags', { params })
+    if (r.code === 200) tags.value = r.data || []
+  } catch (e) {
+    tags.value = []
+    loadError.value = true
+  }
 }
 
 watch([selectedSection, sortBy, selectedType], () => { currentPage.value = 1; loadPosts() })
@@ -109,7 +140,12 @@ onMounted(async () => {
   if (route.query.sectionId) selectedSection.value = Number(route.query.sectionId)
   if (route.query.tagId) selectedTag.value = Number(route.query.tagId)
   if (route.query.postType) selectedType.value = route.query.postType
-  const r = await request.get('/api/sections'); if (r.code === 200) sections.value = r.data || []
+  try {
+    const r = await request.get('/api/sections'); if (r.code === 200) sections.value = r.data || []
+  } catch (e) {
+    sections.value = []
+    loadError.value = true
+  }
   await loadTags()
   loadPosts()
 })
@@ -122,6 +158,10 @@ onMounted(async () => {
 .filter-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
 .filter-actions .el-input { width: 180px; }
 .filter-actions .el-select { width: 110px; }
+.forum-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.forum-aside { position: sticky; top: 82px; }
+.forum-aside h3 { font-size: 15px; margin-bottom: 8px; }
+.forum-aside .quick-link { display: block; padding: 7px 0; color: #4b5563; font-size: 13px; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
 .post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .post-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; color: var(--ink); }
@@ -133,5 +173,7 @@ onMounted(async () => {
   .filter-actions .el-input, .filter-actions .el-select { width: 100%; }
   .post-tags { width: 100%; margin-left: 42px; justify-content: flex-start; }
   .post-meta { flex-wrap: wrap; }
+  .forum-layout { grid-template-columns: 1fr; }
+  .forum-aside { display: none; }
 }
 </style>
