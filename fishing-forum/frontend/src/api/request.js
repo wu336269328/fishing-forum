@@ -24,14 +24,14 @@ request.interceptors.response.use(
     error => {
         if (error.response) {
             const { status } = error.response
-            if (status === 401 || (status === 403 && localStorage.getItem('token'))) {
+            if (status === 401) {
                 // 令牌过期，清除登录状态
                 localStorage.removeItem('token')
                 localStorage.removeItem('user')
                 ElMessage.error('登录已过期，请重新登录')
                 window.location.href = '/login'
             } else if (status === 403) {
-                ElMessage.error('请先登录后再执行此操作')
+                ElMessage.error(localStorage.getItem('token') ? '没有权限执行此操作' : '请先登录后再执行此操作')
             } else {
                 ElMessage.error(error.response.data?.message || '请求失败')
             }

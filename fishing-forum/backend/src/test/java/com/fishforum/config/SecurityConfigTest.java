@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.when;
 
 @WebMvcTest(controllers = SecurityConfigTest.TestEndpoints.class)
 @Import({SecurityConfig.class, SecurityConfigTest.TestEndpointConfig.class})
@@ -59,21 +60,21 @@ class SecurityConfigTest {
     @Test
     void privateGetEndpointsAndUnknownApiRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/users/me"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/messages"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/notifications"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/favorites"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/new-private-report"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
     void uploadEndpointRequiresAuthenticationButUploadedFilesRemainPublic() throws Exception {
         mockMvc.perform(post("/api/upload/image"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/uploads/images/example.jpg"))
                 .andExpect(status().isOk());
     }
@@ -89,6 +90,21 @@ class SecurityConfigTest {
 
     @Test
     void adminEndpointsAreNotCoveredByPublicGetRule() throws Exception {
+        mockMvc.perform(get("/api/admin/statistics"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void invalidBearerTokenReturnsUnauthorizedNotForbidden() throws Exception {
+        when(jwtUtil.validateToken("expired")).thenReturn(false);
+
+        mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer expired"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void authenticatedUserWithoutAdminRoleReturnsForbidden() throws Exception {
         mockMvc.perform(get("/api/admin/statistics"))
                 .andExpect(status().isForbidden());
     }
