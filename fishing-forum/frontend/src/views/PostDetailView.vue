@@ -134,7 +134,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -157,23 +157,48 @@ const requireLogin = (action) => {
   return true
 }
 
-onMounted(async () => {
-  const r = await request.get(`/api/posts/${route.params.id}`)
+const loadComments = async (postId) => {
+  const c = await request.get(`/api/comments/${postId}`)
+  if (c.code === 200) comments.value = c.data || []
+}
+
+const loadHotPosts = async (postId) => {
+  const hp = await request.get('/api/posts/hot', { params: { limit: 8 } })
+  if (hp.code === 200) hotPosts.value = (hp.data || []).filter(p => p.id !== Number(postId))
+}
+
+const loadPostDetail = async () => {
+  const postId = route.params.id
+  post.value = null
+  comments.value = []
+  catchRecord.value = null
+  gearReview.value = null
+  commentContent.value = ''
+  replyContent.value = ''
+  replyTarget.value = null
+  showReport.value = false
+  reportReason.value = ''
+
+  const r = await request.get(`/api/posts/${postId}`)
   if (r.code === 200) {
     post.value = r.data.post || r.data
     catchRecord.value = r.data.catchRecord || null
     gearReview.value = r.data.gearReview || null
   }
-  const c = await request.get(`/api/comments/${route.params.id}`); if (c.code === 200) comments.value = c.data || []
-  const hp = await request.get('/api/posts/hot', { params: { limit: 8 } }); if (hp.code === 200) hotPosts.value = (hp.data || []).filter(p => p.id !== Number(route.params.id))
-})
+  await loadComments(postId)
+  await loadHotPosts(postId)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+onMounted(loadPostDetail)
+watch(() => route.params.id, loadPostDetail)
 
 const submitComment = async (parentId) => {
   if (!requireLogin()) return
   const content = parentId ? replyContent.value : commentContent.value
   if (!content.trim()) return
   const r = await request.post('/api/comments', { postId: post.value.id, content, parentId })
-  if (r.code === 200) { ElMessage.success('评论成功'); commentContent.value = ''; replyContent.value = ''; replyTarget.value = null; const c = await request.get(`/api/comments/${route.params.id}`); if (c.code === 200) comments.value = c.data || []; post.value.commentCount++ }
+  if (r.code === 200) { ElMessage.success('评论成功'); commentContent.value = ''; replyContent.value = ''; replyTarget.value = null; await loadComments(route.params.id); post.value.commentCount++ }
 }
 const toggleLike = async () => {
   if (!requireLogin()) return
