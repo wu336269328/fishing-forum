@@ -93,11 +93,12 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '../api/request'
+import { normalizePostType } from '../utils/postType'
 
-const router = useRouter(), loading = ref(false), uploading = ref(false)
+const route = useRoute(), router = useRouter(), loading = ref(false), uploading = ref(false)
 const sections = ref([]), tags = ref([]), images = ref([])
 const hasDraft = ref(false)
 const DRAFT_KEY = 'fishforum:create-post-draft'
@@ -190,6 +191,7 @@ watch([form, catchForm, reviewForm, images], () => {
 
 onMounted(async () => {
   restoreDraft()
+  form.value.postType = normalizePostType(route.query.postType)
   const r = await request.get('/api/sections'); if (r.code === 200) sections.value = r.data || []
   await loadTags()
 })

@@ -6,7 +6,7 @@
         <h1 class="hero-title">找钓点、聊装备、晒渔获。</h1>
         <p class="hero-subtitle">把每一次出钓经验沉淀成可搜索、可讨论、可复用的社区内容。</p>
       </div>
-      <router-link to="/post/create"><el-button size="large" round>发布渔获</el-button></router-link>
+      <router-link :to="{ path: '/post/create', query: { postType: 'CATCH' } }"><el-button size="large" round>发布渔获</el-button></router-link>
     </section>
     <!-- 公告 -->
     <div v-if="announcements.length" class="card" style="background:#fffbe6; border-color:#ffe58f">
