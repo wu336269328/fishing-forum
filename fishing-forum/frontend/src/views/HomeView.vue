@@ -25,12 +25,12 @@
       <!-- 帖子列表 -->
       <div class="main-col">
         <h2 class="page-title">最新帖子</h2>
-        <div v-for="post in posts" :key="post.id" class="card post-item list-card" @click="$router.push(`/post/${post.id}`)">
-          <div class="card-header">
+        <div v-for="post in posts" :key="post.id" class="card post-item list-card fish-feed-card" @click="$router.push(`/post/${post.id}`)">
+          <div class="card-header post-card-header">
             <img :src="post.authorAvatar || '/default-avatar.png'" class="avatar-sm" />
-            <div>
+            <div class="post-author-block">
               <span class="text-link" @click.stop="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
-              <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
+              <span class="text-muted post-date">{{ formatTime(post.createdAt) }}</span>
             </div>
             <div class="post-tags">
               <el-tag v-if="post.postType==='CATCH'" size="small" type="success">🐟 渔获</el-tag>
@@ -41,9 +41,13 @@
           </div>
           <div class="post-title">{{ post.title }}</div>
           <div class="post-excerpt">{{ stripHtml(post.content) }}</div>
-          <div class="post-meta">
-            <span>{{ post.sectionName }}</span>
-            <span v-if="post.tagName" style="color:#1a73e8">#{{ post.tagName }}</span>
+          <div class="fish-tags">
+            <span class="fish-pill section-pill">{{ sectionIcon(post.sectionName) }} {{ post.sectionName || '钓友交流' }}</span>
+            <span v-if="post.tagName" class="fish-pill">#{{ post.tagName }}</span>
+            <span v-if="post.postType==='CATCH'" class="fish-pill catch-pill">{{ catchHint(post) }}</span>
+            <span v-if="isHot(post)" class="post-hot-badge">水面热帖</span>
+          </div>
+          <div class="post-meta mobile-post-stats">
             <span>👁 {{ post.viewCount }}</span>
             <span>💬 {{ post.commentCount }}</span>
             <span>👍 {{ post.likeCount }}</span>
@@ -123,6 +127,21 @@ const formatTime = (t) => {
   return d.toLocaleDateString('zh-CN')
 }
 const stripHtml = (h) => h ? h.replace(/<[^>]+>/g, '').substring(0, 120) : ''
+const sectionIcon = (name = '') => {
+  if (name.includes('渔获')) return '🐟'
+  if (name.includes('装备')) return '🎣'
+  if (name.includes('技巧')) return '🪝'
+  if (name.includes('钓点')) return '📍'
+  return '🌊'
+}
+const catchHint = (post) => {
+  const text = `${post.title || ''} ${stripHtml(post.content || '')}`
+  for (const word of ['鲫鱼', '翘嘴', '草鱼', '黑坑', '野钓']) {
+    if (text.includes(word)) return word
+  }
+  return '鱼获分享'
+}
+const isHot = (post) => (post.viewCount || 0) >= 200 || (post.likeCount || 0) >= 20
 
 onMounted(async () => {
   const [p, s, a, hp, ht] = await Promise.all([
@@ -150,11 +169,21 @@ onMounted(async () => {
 .eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
 .home-grid { align-items: start; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
-.post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.post-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; color: var(--ink); }
+.post-item:hover { box-shadow: 0 10px 24px rgba(30, 64, 96, .08); }
+.fish-feed-card { border-color: #e3eaf2; box-shadow: 0 8px 20px rgba(15, 23, 42, .045); margin-bottom: 14px; }
+.post-card-header { align-items: center; }
+.post-author-block { display: flex; flex-direction: column; min-width: 0; }
+.post-date { color: #9aa7b4; line-height: 1.2; }
+.post-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; color: var(--ink); line-height: 1.35; }
 .post-excerpt { font-size: 13px; color: #777; margin-bottom: 8px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.post-meta { font-size: 12px; color: #999; display: flex; gap: 12px; }
+.post-meta { font-size: 12px; color: #9aa7b4; display: flex; gap: 12px; }
 .post-tags { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.fish-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0 10px; }
+.fish-pill { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 9px; border: 1px solid #d8e7f4; border-radius: 999px; background: #f4f8fc; color: #4f6f92; font-size: 12px; line-height: 1; }
+.section-pill { background: #edf5ff; color: var(--green-dark); }
+.catch-pill { background: #f0f9f6; border-color: #cbe9dc; color: #287459; }
+.post-hot-badge { display: inline-flex; min-height: 24px; align-items: center; padding: 3px 8px; border-radius: 999px; background: #fff7ed; color: #b66a18; font-size: 12px; }
+.mobile-post-stats { padding-top: 10px; border-top: 1px solid #edf2f7; justify-content: flex-start; }
 .side-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
 .side-item a { color: #555; flex: 1; }
 .side-item a:hover { color: #1a73e8; }
@@ -169,7 +198,9 @@ onMounted(async () => {
 .tag-item:hover { opacity: 0.7; }
 @media (max-width: 768px) {
   .home-hero { align-items: flex-start; flex-direction: column; }
-  .post-tags { width: 100%; margin-left: 42px; justify-content: flex-start; }
+  .post-tags { margin-left: auto; justify-content: flex-end; }
   .post-meta { flex-wrap: wrap; gap: 8px; }
+  .post-card-header .avatar-sm { flex: 0 0 auto; }
+  .fish-feed-card { padding: 15px; }
 }
 </style>

@@ -2,7 +2,7 @@
   <div v-if="post" class="detail-grid responsive-grid page-shell">
     <!-- 主内容区 -->
     <div class="main-col">
-      <div class="card">
+      <div class="card post-detail-card">
         <div class="card-header" style="margin-bottom:12px">
           <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-md" @click="$router.push(`/profile/${post.userId}`)" style="cursor:pointer" />
           <div>
@@ -42,23 +42,23 @@
         </div>
 
         <div class="post-body" v-html="sanitizedContent"></div>
-        <div class="action-bar">
+        <div class="action-bar post-action-bar">
           <el-button size="small" :type="post.liked?'primary':''" @click="toggleLike">👍 {{ post.likeCount }}</el-button>
           <el-button size="small" :type="post.favorited?'warning':''" @click="toggleFavorite">{{ post.favorited?'⭐ 已收藏':'☆ 收藏' }}</el-button>
-          <el-button size="small" @click="showReport=true">🚩 举报</el-button>
+          <el-button class="weak-action" size="small" @click="showReport=true">更多 · 举报</el-button>
           <el-button v-if="isOwner" size="small" @click="$router.push(`/post/edit/${post.id}`)">✏️ 编辑</el-button>
           <el-button v-if="isOwner||isAdmin" size="small" type="danger" @click="deletePost">🗑 删除</el-button>
         </div>
       </div>
 
       <!-- 评论区 -->
-      <div class="card">
-        <h3 style="font-size:15px; margin-bottom:12px">💬 评论 ({{ post.commentCount }})</h3>
-        <div v-if="userStore.isLoggedIn" style="margin-bottom:16px; display:flex; gap:10px">
+      <div class="comment-card card">
+        <h3 class="comment-title">💬 评论 ({{ post.commentCount }})</h3>
+        <div v-if="userStore.isLoggedIn" class="comment-editor">
           <img :src="userStore.user?.avatar||'/default-avatar.png'" class="avatar-sm" style="margin-top:4px" />
-          <div style="flex:1">
-            <el-input v-model="commentContent" type="textarea" :rows="2" placeholder="说点什么..." />
-            <el-button type="primary" size="small" style="margin-top:6px" @click="submitComment(null)" :disabled="!commentContent.trim()">发表</el-button>
+          <div class="comment-input-wrap">
+            <el-input v-model="commentContent" class="compact-comment-input" type="textarea" :rows="2" placeholder="说点什么..." />
+            <el-button class="comment-submit" type="primary" size="small" @click="submitComment(null)" :disabled="!commentContent.trim()">发表</el-button>
           </div>
         </div>
         <div v-else style="text-align:center; padding:8px; font-size:13px; color:#999"><router-link to="/login">登录</router-link>后参与评论</div>
@@ -87,7 +87,7 @@
             </div>
           </div>
         </div>
-        <el-empty v-if="!comments.length" description="暂无评论，来说两句" :image-size="40" />
+        <el-empty v-if="!comments.length" class="compact-empty" description="暂无评论，来抢沙发" :image-size="40" />
       </div>
     </div>
 
@@ -225,10 +225,22 @@ const deletePost = async () => {
 <style scoped>
 .detail-grid { grid-template-columns: minmax(0, 3fr) 1fr; }
 .detail-title { font-size: clamp(22px, 3vw, 34px); line-height: 1.22; margin-bottom: 14px; color: var(--ink); letter-spacing: -0.03em; }
-.post-body { line-height: 1.8; font-size: 15px; color: #444; }
+.post-detail-card { border-color: #e3eaf2; }
+.post-body { line-height: 1.78; font-size: 15px; color: #3f4a56; }
+.post-body :deep(p) { margin: 0 0 12px; }
 .post-body :deep(img) { max-width: 100%; border-radius: 4px; }
 .action-bar { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; }
+.post-action-bar .el-button { border-radius: 999px !important; min-height: 34px; padding: 8px 14px; }
+.post-action-bar .weak-action { color: #8b98a7; background: #f6f8fb; border-color: #edf1f5; }
+.comment-card { border-top: 3px solid #dceaf7; }
+.comment-title { font-size: 15px; margin-bottom: 10px; }
+.comment-editor { margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start; }
+.comment-input-wrap { flex: 1; min-width: 0; }
+.compact-comment-input :deep(textarea) { min-height: 52px !important; max-height: 64px; }
+.comment-submit { margin-top: 6px; border-radius: 999px !important; }
 .comment-item { padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+.compact-empty { height: 120px; display: flex; align-items: center; justify-content: center; }
+.compact-empty :deep(.el-empty__description) { margin-top: 4px; }
 .meta-card { border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-size: 13px; }
 .catch-card { background: #f0fdf4; border: 1px solid #bbf7d0; }
 .review-card { background: #fffbeb; border: 1px solid #fde68a; }
@@ -243,5 +255,14 @@ const deletePost = async () => {
 .rank-3 { background: #ffa940; color: #fff; }
 .quick-link { display: block; padding: 5px 0; font-size: 13px; color: #555; }
 .quick-link:hover { color: #1a73e8; }
-@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .side-col { display: none; } .meta-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .side-col { display: none; }
+  .meta-grid { grid-template-columns: 1fr; }
+  .detail-title { font-size: 23px; line-height: 1.28; letter-spacing: -0.02em; }
+  .post-body { font-size: 15px; line-height: 1.75; }
+  .post-action-bar { gap: 8px; }
+  .post-action-bar .el-button { flex: 0 0 auto; }
+  .comment-item { padding: 12px 0; }
+}
 </style>

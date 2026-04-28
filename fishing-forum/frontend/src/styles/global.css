@@ -11,6 +11,7 @@
   --blue: #4f7fbf;
   --danger: #d64545;
   --warning: #c98317;
+  --mobile-shell-max: 460px;
   --radius-lg: 22px;
   --radius-md: 14px;
   --shadow-soft: 0 14px 36px rgba(79, 127, 191, 0.10);
@@ -28,7 +29,7 @@ body {
   background:
     radial-gradient(circle at 15% 10%, rgba(79, 127, 191, .10), transparent 28%),
     radial-gradient(circle at 82% 0%, rgba(116, 151, 194, .08), transparent 24%),
-    linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
+    linear-gradient(180deg, #f8fbff 0%, #f1f6fb 54%, #f8fafc 100%);
   color: var(--ink);
   line-height: 1.65;
   min-height: 100vh;
@@ -55,8 +56,9 @@ a:hover {
 }
 
 .view-mobile .main-content {
-  max-width: 430px;
-  padding: 14px 10px 96px;
+  width: 100%;
+  max-width: var(--mobile-shell-max);
+  padding: 12px 14px calc(96px + env(safe-area-inset-bottom));
 }
 
 .view-desktop .desktop-nav,
@@ -76,9 +78,9 @@ a:hover {
 }
 
 .view-mobile .header-inner {
-  max-width: 430px;
-  min-height: 58px;
-  padding: 0 14px;
+  max-width: var(--mobile-shell-max);
+  min-height: 60px;
+  padding: 0 16px;
   gap: 10px;
 }
 
@@ -87,8 +89,7 @@ a:hover {
 }
 
 .view-mobile .view-switch {
-  margin-left: auto;
-  max-width: 166px;
+  display: none !important;
 }
 
 .view-mobile .menu-button {
@@ -97,7 +98,7 @@ a:hover {
 
 .view-mobile .mobile-panel {
   display: grid;
-  max-width: 430px;
+  max-width: var(--mobile-shell-max);
   margin: 0 auto;
   gap: 6px;
   padding: 10px 14px 14px;
@@ -121,9 +122,9 @@ a:hover {
   position: fixed;
   left: 50%;
   right: auto;
-  bottom: 10px;
+  bottom: max(10px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  width: min(410px, calc(100vw - 20px));
+  width: min(428px, calc(100vw - 20px));
   z-index: 120;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -132,6 +133,7 @@ a:hover {
   border: 1px solid var(--line);
   border-radius: 22px;
   background: rgba(255,255,255,.94);
+  backdrop-filter: blur(16px);
   box-shadow: 0 18px 40px rgba(30, 41, 59, .16);
 }
 
@@ -153,6 +155,8 @@ a:hover {
   color: #fff;
   background: var(--green);
   font-weight: 700;
+  transform: translateY(-6px);
+  box-shadow: 0 10px 22px rgba(79, 127, 191, .25);
 }
 
 .page-title {
@@ -213,10 +217,10 @@ a:hover {
 .card {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .045);
 }
 
 .card:hover {
@@ -362,7 +366,7 @@ canvas {
 
 @media (max-width: 900px) {
   .main-content {
-    padding: 16px 12px 96px;
+    padding: 12px 14px calc(96px + env(safe-area-inset-bottom));
   }
 
   .responsive-grid {
@@ -379,7 +383,7 @@ canvas {
 
   .card {
     padding: 14px;
-    border-radius: 18px;
+    border-radius: 16px;
   }
 
   .page-title {
@@ -397,4 +401,23 @@ canvas {
 
 .view-mobile .stat-row {
   grid-template-columns: repeat(2, 1fr);
+}
+
+.view-mobile .page-shell {
+  padding-bottom: 6px;
+}
+
+.view-mobile .avatar-sm {
+  width: 38px;
+  height: 38px;
+}
+
+.view-mobile .footer {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 520px) {
+  .main-content {
+    width: 100%;
+  }
 }

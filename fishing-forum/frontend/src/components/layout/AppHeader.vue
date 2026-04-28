@@ -99,7 +99,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.header { background: rgba(255,255,255,0.9); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(14px); }
+.header { background: rgba(255,255,255,0.92); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(14px); }
 .header-inner { max-width: 1440px; margin: 0 auto; padding: 0 24px; min-height: 64px; display: flex; align-items: center; gap: 18px; }
 .logo { font-size: 16px; color: var(--ink); text-decoration: none; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
 .logo-mark { width: 36px; height: 36px; border-radius: 14px; background: linear-gradient(135deg, #365f93, #4f7fbf); color: #fff; display: grid; place-items: center; box-shadow: var(--shadow-soft); }
@@ -121,16 +121,18 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .desktop-nav, .actions { display: none; }
-  .header-inner { min-height: 58px; padding: 0 14px; gap: 10px; }
+  .header-inner { min-height: 60px; padding: 0 16px; gap: 10px; }
   .logo small { display: none; }
-  .view-switch { margin-left: auto; max-width: 166px; }
+  .view-switch { display: none; }
+  .logo { font-size: 15px; }
+  .logo-mark { width: 34px; height: 34px; border-radius: 13px; }
   .menu-button { display: block; }
   .mobile-panel { display: grid; gap: 6px; padding: 10px 14px 14px; background: rgba(255,255,255,0.96); border-top: 1px solid var(--line); box-shadow: var(--shadow-soft); }
   .mobile-panel a, .mobile-panel button { border: 0; border-radius: 12px; padding: 12px 14px; background: var(--sand); color: var(--ink); text-align: left; font-size: 14px; }
-  .mobile-tabbar { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 120; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(30, 41, 59, .16); }
+  .mobile-tabbar { position: fixed; left: 10px; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 120; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(30, 41, 59, .16); }
   .mobile-tabbar a { color: #4b5563; font-size: 12px; text-align: center; padding: 7px 2px; border-radius: 14px; }
   .mobile-tabbar a.router-link-active { color: var(--green); background: var(--green-soft); font-weight: 700; }
-  .mobile-tabbar .create-tab { color: #fff; background: var(--green); font-weight: 700; }
+  .mobile-tabbar .create-tab { color: #fff; background: var(--green); font-weight: 700; transform: translateY(-6px); box-shadow: 0 10px 22px rgba(79, 127, 191, .25); }
 }
 
 </style>
