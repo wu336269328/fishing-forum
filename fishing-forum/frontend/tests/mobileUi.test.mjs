@@ -8,7 +8,10 @@ const header = readFileSync(new URL('../src/components/layout/AppHeader.vue', im
 
 assert.match(globalCss, /--mobile-shell-max:\s*460px/)
 assert.match(globalCss, /\.view-mobile \.main-content\s*\{[\s\S]*padding:\s*12px 14px calc\(96px \+ env\(safe-area-inset-bottom\)\)/)
+assert.match(globalCss, /html,\s*body,\s*#app\s*\{[\s\S]*overflow-x:\s*hidden/)
 assert.match(globalCss, /\.view-mobile \.mobile-tabbar\s*\{[\s\S]*bottom:\s*max\(10px, env\(safe-area-inset-bottom\)\)/)
+assert.match(globalCss, /\.view-mobile \.mobile-tabbar\s*\{[\s\S]*left:\s*max\(10px, env\(safe-area-inset-left\)\)/)
+assert.match(globalCss, /\.view-mobile \.mobile-tabbar\s*\{[\s\S]*right:\s*max\(10px, env\(safe-area-inset-right\)\)/)
 assert.match(globalCss, /\.view-mobile \.mobile-tabbar \.create-tab\s*\{[\s\S]*transform:\s*translateY\(-6px\)/)
 assert.match(globalCss, /\.view-mobile \.view-switch\s*\{[\s\S]*display:\s*none !important/)
 
@@ -23,3 +26,4 @@ assert.match(postDetail, /class="comment-card card"/)
 assert.match(postDetail, /description="暂无评论，来抢沙发"/)
 
 assert.match(header, /class="mobile-tabbar"/)
+assert.match(header, /grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/)

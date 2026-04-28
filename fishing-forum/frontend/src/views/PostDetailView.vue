@@ -224,6 +224,7 @@ const deletePost = async () => {
 
 <style scoped>
 .detail-grid { grid-template-columns: minmax(0, 3fr) 1fr; }
+.main-col { min-width: 0; }
 .detail-title { font-size: clamp(22px, 3vw, 34px); line-height: 1.22; margin-bottom: 14px; color: var(--ink); letter-spacing: -0.03em; }
 .post-detail-card { border-color: #e3eaf2; }
 .post-body { line-height: 1.78; font-size: 15px; color: #3f4a56; }
@@ -264,5 +265,6 @@ const deletePost = async () => {
   .post-action-bar { gap: 8px; }
   .post-action-bar .el-button { flex: 0 0 auto; }
   .comment-item { padding: 12px 0; }
+  .compact-empty { height: 104px; padding-bottom: 8px; }
 }
 </style>

@@ -129,7 +129,7 @@ onMounted(async () => {
   .menu-button { display: block; }
   .mobile-panel { display: grid; gap: 6px; padding: 10px 14px 14px; background: rgba(255,255,255,0.96); border-top: 1px solid var(--line); box-shadow: var(--shadow-soft); }
   .mobile-panel a, .mobile-panel button { border: 0; border-radius: 12px; padding: 12px 14px; background: var(--sand); color: var(--ink); text-align: left; font-size: 14px; }
-  .mobile-tabbar { position: fixed; left: 10px; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 120; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(30, 41, 59, .16); }
+  .mobile-tabbar { position: fixed; left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: auto; transform: none; z-index: 120; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(30, 41, 59, .16); }
   .mobile-tabbar a { color: #4b5563; font-size: 12px; text-align: center; padding: 7px 2px; border-radius: 14px; }
   .mobile-tabbar a.router-link-active { color: var(--green); background: var(--green-soft); font-weight: 700; }
   .mobile-tabbar .create-tab { color: #fff; background: var(--green); font-weight: 700; transform: translateY(-6px); box-shadow: 0 10px 22px rgba(79, 127, 191, .25); }

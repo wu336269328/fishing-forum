@@ -24,6 +24,13 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   font-family: -apple-system, 'Segoe UI', 'Noto Sans SC', sans-serif;
   background:
@@ -49,6 +56,7 @@ a:hover {
   margin: 0 auto;
   padding: 24px;
   flex: 1;
+  min-width: 0;
 }
 
 .view-desktop .main-content {
@@ -59,6 +67,7 @@ a:hover {
   width: 100%;
   max-width: var(--mobile-shell-max);
   padding: 12px 14px calc(96px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
 }
 
 .view-desktop .desktop-nav,
@@ -120,11 +129,13 @@ a:hover {
 
 .view-mobile .mobile-tabbar {
   position: fixed;
-  left: 50%;
-  right: auto;
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
   bottom: max(10px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  width: min(428px, calc(100vw - 20px));
+  transform: none;
+  width: auto;
+  max-width: var(--mobile-shell-max);
+  margin: 0 auto;
   z-index: 120;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -169,6 +180,7 @@ a:hover {
 
 .page-shell {
   animation: page-rise .35s ease both;
+  min-width: 0;
 }
 
 .hero-panel {
@@ -203,6 +215,7 @@ a:hover {
   font-size: clamp(24px, 4vw, 42px);
   line-height: 1.15;
   letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
 }
 
 .hero-subtitle {
@@ -212,6 +225,7 @@ a:hover {
   margin-top: 10px;
   color: rgba(255,255,255,.78);
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .card {
@@ -367,6 +381,7 @@ canvas {
 @media (max-width: 900px) {
   .main-content {
     padding: 12px 14px calc(96px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
   }
 
   .responsive-grid {
@@ -384,6 +399,7 @@ canvas {
   .card {
     padding: 14px;
     border-radius: 16px;
+    min-width: 0;
   }
 
   .page-title {

@@ -164,10 +164,12 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.home-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; max-width: 100%; }
+.home-hero > div { min-width: 0; max-width: 100%; }
 .hero-action { position: relative; z-index: 1; flex-shrink: 0; }
 .eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
 .home-grid { align-items: start; }
+.main-col { min-width: 0; }
 .post-item { cursor: pointer; transition: box-shadow 0.15s; }
 .post-item:hover { box-shadow: 0 10px 24px rgba(30, 64, 96, .08); }
 .fish-feed-card { border-color: #e3eaf2; box-shadow: 0 8px 20px rgba(15, 23, 42, .045); margin-bottom: 14px; }
@@ -198,6 +200,7 @@ onMounted(async () => {
 .tag-item:hover { opacity: 0.7; }
 @media (max-width: 768px) {
   .home-hero { align-items: flex-start; flex-direction: column; }
+  .hero-action { width: auto; }
   .post-tags { margin-left: auto; justify-content: flex-end; }
   .post-meta { flex-wrap: wrap; gap: 8px; }
   .post-card-header .avatar-sm { flex: 0 0 auto; }
