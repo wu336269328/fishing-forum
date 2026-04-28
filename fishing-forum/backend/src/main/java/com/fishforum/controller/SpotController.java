@@ -50,7 +50,8 @@ public class SpotController {
     // 更新钓点
     @PutMapping("/{id}")
     public Result<?> updateSpot(@PathVariable Long id, @RequestBody FishingSpot spot, Authentication auth) {
-        return spotService.updateSpot(id, spot, (Long) auth.getPrincipal());
+        String role = auth.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
+        return spotService.updateSpot(id, spot, (Long) auth.getPrincipal(), role);
     }
 
     // 删除钓点

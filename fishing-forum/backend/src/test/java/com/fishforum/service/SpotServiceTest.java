@@ -74,7 +74,7 @@ class SpotServiceTest {
         FishingSpot spot = spot(7L, 3L);
         when(spotMapper.selectById(7L)).thenReturn(spot);
 
-        assertThat(spotService.updateSpot(7L, new FishingSpot(), 4L).getCode()).isEqualTo(403);
+        assertThat(spotService.updateSpot(7L, new FishingSpot(), 4L, "USER").getCode()).isEqualTo(403);
         assertThat(spotService.deleteSpot(7L, 4L, "USER").getCode()).isEqualTo(403);
         assertThat(spotService.deleteSpot(7L, 4L, "ADMIN").getCode()).isEqualTo(200);
         verify(spotMapper).deleteById(7L);
@@ -89,12 +89,26 @@ class SpotServiceTest {
         update.setNoFishingNotice("繁殖期禁钓");
         when(spotMapper.selectById(7L)).thenReturn(spot);
 
-        Result<?> result = spotService.updateSpot(7L, update, 3L);
+        Result<?> result = spotService.updateSpot(7L, update, 3L, "USER");
 
         assertThat(result.getData()).isEqualTo("更新成功");
         assertThat(spot.getBestSeason()).isEqualTo("夏季夜钓");
         assertThat(spot.getFeeInfo()).isEqualTo("50元/天");
         assertThat(spot.getNoFishingNotice()).isEqualTo("繁殖期禁钓");
+        verify(spotMapper).updateById(spot);
+    }
+
+    @Test
+    void updateSpotAllowsAdminToEditAnySpot() {
+        FishingSpot spot = spot(7L, 3L);
+        FishingSpot update = new FishingSpot();
+        update.setName("管理员修正钓点");
+        when(spotMapper.selectById(7L)).thenReturn(spot);
+
+        Result<?> result = spotService.updateSpot(7L, update, 1L, "ADMIN");
+
+        assertThat(result.getData()).isEqualTo("更新成功");
+        assertThat(spot.getName()).isEqualTo("管理员修正钓点");
         verify(spotMapper).updateById(spot);
     }
 

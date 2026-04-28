@@ -72,11 +72,11 @@ public class SpotService {
 
     // 更新钓点
     @Transactional
-    public Result<?> updateSpot(Long id, FishingSpot update, Long userId) {
+    public Result<?> updateSpot(Long id, FishingSpot update, Long userId, String role) {
         FishingSpot spot = spotMapper.selectById(id);
         if (spot == null)
             return Result.error(404, "钓点不存在");
-        if (!spot.getUserId().equals(userId))
+        if (!spot.getUserId().equals(userId) && !"ADMIN".equals(role))
             return Result.error(403, "无权修改");
         if (update.getName() != null)
             spot.setName(update.getName());
