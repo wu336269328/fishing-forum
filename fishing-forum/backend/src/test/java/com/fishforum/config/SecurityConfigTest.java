@@ -11,10 +11,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -86,6 +90,16 @@ class SecurityConfigTest {
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/upload/image"))
                 .andExpect(status().isOk());
+        mockMvc.perform(post("/api/spots"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/spots/1/reviews"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/spots/1/favorite"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/spots/1"))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/spots/1"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -137,6 +151,21 @@ class SecurityConfigTest {
         @PostMapping("/api/upload/image")
         String uploadEndpoint() {
             return "upload";
+        }
+
+        @PostMapping({"/api/spots", "/api/spots/1/reviews", "/api/spots/1/favorite"})
+        String privateSpotPostEndpoint() {
+            return "spot-write";
+        }
+
+        @PutMapping("/api/spots/1")
+        String privateSpotPutEndpoint() {
+            return "spot-update";
+        }
+
+        @DeleteMapping("/api/spots/1")
+        String privateSpotDeleteEndpoint() {
+            return "spot-delete";
         }
     }
 }

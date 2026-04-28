@@ -6,7 +6,7 @@
       <el-select v-model="spotType" placeholder="类型" clearable size="small" style="width:100px">
         <el-option v-for="t in ['水库','河流','湖泊','海钓','黑坑']" :key="t" :label="t" :value="t" />
       </el-select>
-      <el-button type="primary" size="small" @click="showAdd=true">+ 分享钓点</el-button>
+      <el-button type="primary" size="small" @click="openAddSpot">+ 分享钓点</el-button>
     </div>
     <div class="spots-grid">
       <div v-for="s in spots" :key="s.id" class="card spot-card" @click="selected=s; showDetail=true">
@@ -119,11 +119,31 @@ const addForm = ref(emptySpotForm())
 const toGoogleMap = (s) => `https://www.google.com/maps?q=${s.latitude},${s.longitude}`
 const toAmapLink = (s) => `https://uri.amap.com/marker?position=${s.longitude},${s.latitude}&name=${encodeURIComponent(s.name)}`
 
+const requireLogin = () => {
+  if (userStore.isLoggedIn) return true
+  ElMessage.warning('请先登录后再执行此操作')
+  return false
+}
+
+const openAddSpot = () => {
+  if (!requireLogin()) return
+  showAdd.value = true
+}
+
 const loadSpots = async () => { const r = await request.get('/api/spots', { params: { keyword: keyword.value, spotType: spotType.value, page: 1, size: 50 } }); if (r.code === 200) spots.value = r.data.records || [] }
 const loadReviews = async (id) => { const r = await request.get(`/api/spots/${id}/reviews`); if (r.code === 200) reviews.value = r.data || [] }
-const submitReview = async () => { if (!reviewForm.value.content.trim()) return; await request.post(`/api/spots/${selected.value.id}/reviews`, reviewForm.value); ElMessage.success('已评价'); reviewForm.value = { rating: 5, content: '' }; loadReviews(selected.value.id); loadSpots() }
+const submitReview = async () => {
+  if (!requireLogin()) return
+  if (!reviewForm.value.content.trim()) return
+  await request.post(`/api/spots/${selected.value.id}/reviews`, reviewForm.value)
+  ElMessage.success('已评价')
+  reviewForm.value = { rating: 5, content: '' }
+  loadReviews(selected.value.id)
+  loadSpots()
+}
 
 const toggleSpotFavorite = async (spot) => {
+  if (!requireLogin()) return
   const r = await request.post(`/api/spots/${spot.id}/favorite`)
   if (r.code === 200) ElMessage.success(r.data || r.message)
 }
@@ -139,6 +159,7 @@ const getLocation = () => {
 }
 
 const uploadSpotImage = async (e) => {
+  if (!requireLogin()) { e.target.value = ''; return }
   const file = e.target.files[0]; if (!file) return
   spotUploading.value = true
   const fd = new FormData(); fd.append('file', file)
@@ -150,6 +171,7 @@ const uploadSpotImage = async (e) => {
 }
 
 const submitSpot = async () => {
+  if (!requireLogin()) return
   if (!addForm.value.name) return ElMessage.warning('请输入名称')
   if (!addForm.value.latitude || !addForm.value.longitude) return ElMessage.warning('请输入位置坐标或使用定位')
   await request.post('/api/spots', addForm.value)
