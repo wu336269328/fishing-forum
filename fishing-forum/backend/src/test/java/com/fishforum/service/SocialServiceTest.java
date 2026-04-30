@@ -34,6 +34,7 @@ class SocialServiceTest {
     @Test
     void toggleFollowRejectsSelfAndCreatesNotificationForNewFollow() {
         assertThat(socialService.toggleFollow(3L, 3L).getCode()).isEqualTo(500);
+        when(userMapper.selectById(4L)).thenReturn(user(4L, "friend"));
         when(followMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         Result<?> result = socialService.toggleFollow(4L, 3L);
@@ -46,6 +47,7 @@ class SocialServiceTest {
 
     @Test
     void toggleFollowDeletesExistingFollow() {
+        when(userMapper.selectById(4L)).thenReturn(user(4L, "friend"));
         Follow follow = new Follow();
         follow.setId(8L);
         when(followMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(follow);
@@ -65,7 +67,7 @@ class SocialServiceTest {
         User user = user(4L, "friend");
         user.setPassword("secret");
         when(followMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(follow));
-        when(userMapper.selectById(4L)).thenReturn(user);
+        when(userMapper.selectBatchIds(anyCollection())).thenReturn(List.of(user));
 
         List<?> users = (List<?>) socialService.getFollowings(3L).getData();
 
@@ -74,6 +76,7 @@ class SocialServiceTest {
 
     @Test
     void sendMessagePersistsAndPushesToReceiverQueue() {
+        when(userMapper.selectById(4L)).thenReturn(user(4L, "receiver"));
         Result<?> result = socialService.sendMessage(4L, "hello", 3L);
 
         assertThat(result.getMessage()).isEqualTo("发送成功");
@@ -92,6 +95,7 @@ class SocialServiceTest {
 
     @Test
     void getConversationMarksIncomingMessagesRead() {
+        when(userMapper.selectById(4L)).thenReturn(user(4L, "friend"));
         Message unread = new Message();
         unread.setId(5L);
         unread.setSenderId(4L);
@@ -135,7 +139,7 @@ class SocialServiceTest {
         page.setRecords(List.of(post));
         page.setTotal(1);
         when(postMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
-        when(userMapper.selectById(4L)).thenReturn(user(4L, "friend"));
+        when(userMapper.selectBatchIds(anyCollection())).thenReturn(List.of(user(4L, "friend")));
 
         Map<?, ?> data = (Map<?, ?>) socialService.getFollowFeed(3L, 1, 10).getData();
 

@@ -1,12 +1,12 @@
 package com.fishforum.controller;
 
 import com.fishforum.common.Result;
+import com.fishforum.dto.MessageCreateRequest;
 import com.fishforum.service.SocialService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 /**
  * 社交与消息控制器
@@ -58,10 +58,8 @@ public class SocialController {
 
     // 发送私信
     @PostMapping("/messages")
-    public Result<?> sendMessage(@RequestBody Map<String, Object> body, Authentication auth) {
-        Long receiverId = Long.valueOf(body.get("receiverId").toString());
-        String content = (String) body.get("content");
-        return socialService.sendMessage(receiverId, content, (Long) auth.getPrincipal());
+    public Result<?> sendMessage(@Valid @RequestBody MessageCreateRequest request, Authentication auth) {
+        return socialService.sendMessage(request.getReceiverId(), request.getContent(), (Long) auth.getPrincipal());
     }
 
     // 获取与某用户的对话

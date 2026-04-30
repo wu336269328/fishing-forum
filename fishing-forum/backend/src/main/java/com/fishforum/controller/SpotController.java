@@ -1,13 +1,13 @@
 package com.fishforum.controller;
 
 import com.fishforum.common.Result;
-import com.fishforum.entity.FishingSpot;
+import com.fishforum.dto.SpotCreateRequest;
+import com.fishforum.dto.SpotReviewRequest;
 import com.fishforum.service.SpotService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 /**
  * 钓点控制器
@@ -43,15 +43,15 @@ public class SpotController {
 
     // 新增钓点
     @PostMapping
-    public Result<?> createSpot(@RequestBody FishingSpot spot, Authentication auth) {
-        return spotService.createSpot(spot, (Long) auth.getPrincipal());
+    public Result<?> createSpot(@Valid @RequestBody SpotCreateRequest request, Authentication auth) {
+        return spotService.createSpot(request, (Long) auth.getPrincipal());
     }
 
     // 更新钓点
     @PutMapping("/{id}")
-    public Result<?> updateSpot(@PathVariable Long id, @RequestBody FishingSpot spot, Authentication auth) {
+    public Result<?> updateSpot(@PathVariable Long id, @Valid @RequestBody SpotCreateRequest request, Authentication auth) {
         String role = auth.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
-        return spotService.updateSpot(id, spot, (Long) auth.getPrincipal(), role);
+        return spotService.updateSpot(id, request, (Long) auth.getPrincipal(), role);
     }
 
     // 删除钓点
@@ -63,10 +63,9 @@ public class SpotController {
 
     // 添加评价
     @PostMapping("/{spotId}/reviews")
-    public Result<?> addReview(@PathVariable Long spotId, @RequestBody Map<String, Object> body, Authentication auth) {
-        Integer rating = (Integer) body.get("rating");
-        String content = (String) body.get("content");
-        return spotService.addReview(spotId, rating, content, (Long) auth.getPrincipal());
+    public Result<?> addReview(@PathVariable Long spotId, @Valid @RequestBody SpotReviewRequest request,
+            Authentication auth) {
+        return spotService.addReview(spotId, request.getRating(), request.getContent(), (Long) auth.getPrincipal());
     }
 
     // 获取钓点评价（公开）

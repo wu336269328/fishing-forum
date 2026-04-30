@@ -1,0 +1,716 @@
+============================================================
+面向钓鱼爱好者的网上交流系统 — 项目技术详解
+============================================================
+
+一、项目概述
+
+本项目是一个面向钓鱼爱好者的综合性网上交流系统（钓友圈），
+采用前后端分离的B/S架构，实现"社区交流 + 知识沉淀 + 信息查询"三位一体的服务平台。
+系统分为前端、后端、数据库三大部分，通过Docker容器化部署，实现一键启动运行。
+
+项目代码托管于GitHub，主分支为main，项目地址：https://github.com/wu336269328/fishing-forum
+
+============================================================
+二、技术栈总览
+============================================================
+
++--------------------+-------------------------------------------+
+|    技术层面        |    具体技术                                |
++--------------------+-------------------------------------------+
+| 后端框架           | Spring Boot 3.2.5 (Java 17)              |
+| 安全框架           | Spring Security + JWT (JJWT 0.12.5)      |
+| 持久层框架         | MyBatis-Plus 3.5.6                       |
+| 数据库             | PostgreSQL 16                            |
+| 实时通信           | Spring WebSocket                         |
+| 代码简化           | Lombok                                   |
+| 数据校验           | Spring Boot Starter Validation           |
+| 文件处理           | Commons IO 2.15.1                        |
++--------------------+-------------------------------------------+
+| 前端框架           | Vue 3.4.21 (Composition API)             |
+| 构建工具           | Vite 5.2.8                               |
+| 状态管理           | Pinia 2.1.7                              |
+| 路由管理           | Vue Router 4.3.0                         |
+| HTTP客户端         | Axios 1.6.8                              |
+| UI组件库           | Element Plus 2.7.0                       |
+| 图标库             | @element-plus/icons-vue 2.3.1            |
+| 富文本编辑器       | @vueup/vue-quill 1.2.0                   |
+| Markdown渲染       | marked 12.0.1                            |
+| XSS防护            | DOMPurify 3.3.1                          |
++--------------------+-------------------------------------------+
+| 容器化             | Docker + Docker Compose                  |
+| Web服务器          | Nginx (前端静态资源 + 反向代理)           |
+| 版本控制           | Git + GitHub                             |
++--------------------+-------------------------------------------+
+
+============================================================
+三、后端技术详解
+============================================================
+
+3.1 项目结构
+
+后端项目基于Maven构建，采用标准Spring Boot项目结构：
+
+fishing-forum/backend/
+├── pom.xml                              # Maven依赖配置
+├── Dockerfile                           # Docker构建文件
+├── entrypoint.sh                        # 容器启动脚本
+├── uploads/                             # 用户上传文件存储目录
+└── src/main/
+    ├── java/com/fishforum/
+    │   ├── FishForumApplication.java    # Spring Boot启动类
+    │   ├── common/                      # 通用工具类
+    │   │   ├── Result.java              # 统一响应封装
+    │   │   └── JwtUtil.java             # JWT工具类
+    │   ├── config/                      # 配置类
+    │   │   ├── SecurityConfig.java      # Spring Security安全配置
+    │   │   ├── MyBatisPlusConfig.java   # MyBatis-Plus配置
+    │   │   ├── CorsConfig.java          # 跨域配置
+    │   │   ├── WebConfig.java           # Web配置（静态资源映射）
+    │   │   └── WebSocketConfig.java     # WebSocket配置
+    │   ├── entity/                      # 实体类（18个）
+    │   ├── mapper/                      # 数据访问层（18个Mapper接口）
+    │   ├── service/                     # 业务逻辑层（8个Service类）
+    │   └── controller/                  # 控制器层（10个Controller类）
+    └── resources/
+        ├── application.yml              # 应用配置
+        ├── schema.sql                   # 数据库建表脚本
+        └── data.sql                     # 初始化数据脚本
+
+3.2 分层架构
+
+后端严格遵循Controller → Service → Mapper三层分层架构：
+
+（1）Controller层（10个控制器）
+    - AuthController：      注册/登录认证接口
+    - UserController：       用户信息管理（个人资料、头像、密码）
+    - PostController：       帖子CRUD（发帖、编辑、删除、分页查询）
+    - InteractionController：评论/点赞/收藏/举报互动接口
+    - SocialController：     关注/私信/通知社交接口
+    - SpotController：       钓点管理与评价接口
+    - WikiController：       知识百科词条管理接口
+    - WeatherController：    天气查询代理接口
+    - AnnouncementController：公告查询接口
+    - AdminController：      后台管理接口（需ADMIN角色）
+
+（2）Service层（8个服务类）
+    - UserService：          用户注册、登录、JWT生成、信息管理
+    - PostService：          帖子发布/编辑/删除/查询/热门排序
+    - InteractionService：   评论树构建、点赞toggle、收藏管理、举报
+    - SocialService：        关注关系、私信对话、通知管理
+    - SpotService：          钓点CRUD、评分计算
+    - WikiService：          词条编辑、版本控制、分类查询
+    - WeatherService：       第三方天气API调用与数据封装
+    - AdminService：         用户管理、内容审核、数据统计
+
+（3）Mapper层（18个数据访问接口）
+    每个实体对应一个Mapper接口，均继承MyBatis-Plus的BaseMapper<T>：
+    UserMapper, PostMapper, CommentMapper, LikeMapper, FavoriteMapper,
+    FollowMapper, MessageMapper, NotificationMapper, SectionMapper,
+    TagMapper, FishingSpotMapper, SpotReviewMapper, WikiEntryMapper,
+    WikiHistoryMapper, CatchRecordMapper, GearReviewMapper,
+    ReportMapper, AnnouncementMapper
+
+3.3 身份认证与权限控制
+
+系统采用Spring Security + JWT实现无状态认证：
+
+（1）JWT令牌生成（JwtUtil.java）
+    - 使用JJWT 0.12.5库
+    - 令牌载荷包含：userId（用户ID）、username（用户名）、role（角色）
+    - 签名算法：HS256
+    - 有效期：24小时（86400000毫秒）
+    - 密钥：配置在application.yml的jwt.secret字段
+
+（2）JWT认证过滤器（SecurityConfig.JwtAuthFilter）
+    - 继承OncePerRequestFilter，每个请求执行一次
+    - 从请求头提取"Authorization: Bearer <token>"
+    - 调用JwtUtil验证令牌有效性
+    - 解析userId、username、role设置到SecurityContext
+    - Principal存储的是userId（Long类型），用于Controller中获取当前用户
+
+（3）安全规则配置（SecurityConfig.filterChain）
+    - 关闭CSRF（前后端分离不需要）
+    - 无状态会话管理（SessionCreationPolicy.STATELESS）
+    - 权限规则：
+      · /api/auth/**        → permitAll（注册登录公开）
+      · /api/uploads/**     → permitAll（上传文件访问公开）
+      · /api/statistics/**  → permitAll（公开统计数据）
+      · /ws/**              → permitAll（WebSocket公开）
+      · /api/admin/**       → hasRole("ADMIN")（管理员专属）
+      · GET /api/**         → permitAll（所有GET请求公开，游客可浏览）
+      · 其余请求            → authenticated（POST/PUT/DELETE需登录）
+
+（4）密码加密
+    - BCryptPasswordEncoder对用户密码进行不可逆加密
+    - 注册时加密存储，登录时BCrypt.matches()验证
+
+3.4 统一响应封装（Result.java）
+
+所有API统一返回Result<T>对象：
+    {
+        "code": 200,          // 业务状态码（200成功，其他为错误码）
+        "message": "操作成功",  // 提示消息
+        "data": { ... }        // 业务数据（泛型）
+    }
+
+提供静态方法：
+    - Result.ok()：           成功，无数据
+    - Result.ok(data)：       成功，带数据
+    - Result.ok(msg, data)：  成功，自定义消息
+    - Result.error(code, msg)：失败，指定错误码和消息
+
+注意：HTTP状态码始终为200，错误通过JSON body中的code字段区分。
+
+3.5 帖子类型系统
+
+系统支持三种帖子类型（通过post_type字段区分）：
+
+（1）NORMAL — 普通讨论帖
+    仅包含标题、内容、板块、标签等基本信息。
+
+（2）CATCH — 渔获日记
+    除基本信息外，额外存储CatchRecord表：
+    - fish_species（鱼种）
+    - weight（重量/斤）
+    - length（长度/cm）
+    - bait（饵料）
+    - spot_name（钓点名称）
+    - weather（天气）
+    - photo_url（渔获照片）
+    - fishing_date（垂钓日期）
+
+（3）REVIEW — 装备测评
+    除基本信息外，额外存储GearReview表：
+    - brand（品牌）
+    - model（型号）
+    - gear_category（分类：鱼竿/鱼线/鱼钩/浮漂/饵料/其他）
+    - price（价格/元）
+    - rating（评分1-5）
+    - pros/cons（优缺点）
+    - photo_url（装备照片）
+
+3.6 MyBatis-Plus配置
+
+MyBatis-Plus全局配置（application.yml + MyBatisPlusConfig.java）：
+    - 驼峰命名映射（map-underscore-to-camel-case: true）
+    - 主键策略：自增（id-type: auto）
+    - 逻辑删除：字段名deleted，删除值1，未删除值0
+    - 分页插件：MybatisPlusInterceptor + PaginationInnerInterceptor
+    - SQL日志：StdOutImpl（开发环境输出SQL到控制台）
+
+3.7 文件上传
+
+    - 存储方式：服务器本地文件系统（./uploads/目录）
+    - 文件大小限制：单文件10MB，请求总大小20MB
+    - 上传接口：/api/upload/image（图片上传）、/api/users/me/avatar（头像上传）
+    - 访问路径：/api/uploads/**（通过WebConfig静态资源映射）
+    - Docker部署时通过Volume持久化：./backend/uploads:/app/uploads
+
+3.8 天气查询服务
+
+WeatherService通过RestTemplate调用和风天气（QWeather）API：
+    - 实时天气：温度、湿度、风向风力、体感温度、气压、能见度等
+    - 空气质量：AQI指数、各污染物浓度（PM2.5/PM10/NO2/SO2/CO/O3）
+    - 生活指数：运动、穿衣、紫外线、钓鱼等指数
+    - 多日预报：未来几天天气预报数据
+    - 钓鱼指数：根据温度、风力、气压、天气状况算法计算适宜等级
+
+============================================================
+四、前端技术详解
+============================================================
+
+4.1 项目结构
+
+前端项目基于Vite构建，采用Vue 3 Composition API：
+
+fishing-forum/frontend/
+├── package.json                     # 依赖配置
+├── vite.config.js                   # Vite构建配置
+├── Dockerfile                       # Docker多阶段构建
+├── nginx.conf                       # Nginx服务配置
+├── index.html                       # 入口HTML
+├── public/                          # 静态资源
+│   └── default-avatar.png           # 默认头像
+└── src/
+    ├── main.js                      # 应用入口（挂载Vue/Pinia/Router/ElementPlus）
+    ├── App.vue                      # 根组件（AppHeader + RouterView）
+    ├── api/
+    │   └── request.js               # Axios请求封装（JWT拦截器）
+    ├── stores/
+    │   └── user.js                  # Pinia用户状态管理
+    ├── styles/
+    │   └── global.css               # 全局样式（max-width:1440px）
+    ├── components/
+    │   └── layout/
+    │       └── AppHeader.vue        # 顶部导航栏组件
+    └── views/                       # 页面视图（18个）
+        ├── HomeView.vue             # 首页
+        ├── LoginView.vue            # 登录页
+        ├── RegisterView.vue         # 注册页
+        ├── ForumView.vue            # 论坛列表页
+        ├── CreatePostView.vue       # 发帖页
+        ├── EditPostView.vue         # 编辑帖子页
+        ├── PostDetailView.vue       # 帖子详情页（含评论、点赞、收藏）
+        ├── ProfileView.vue          # 个人中心（帖子/收藏/编辑/关注/私信）
+        ├── SpotMapView.vue          # 钓点推荐页
+        ├── WikiView.vue             # 百科列表页
+        ├── WikiDetailView.vue       # 百科词条详情页（含编辑历史）
+        ├── WeatherView.vue          # 天气查询页
+        ├── MessageView.vue          # 私信对话页
+        ├── NotificationView.vue     # 通知中心页
+        └── admin/                   # 后台管理
+            ├── DashboardView.vue    # 管理仪表盘
+            ├── UserManageView.vue   # 用户管理
+            ├── ContentAuditView.vue # 内容审核
+            └── AnnouncementView.vue # 公告管理
+
+4.2 路由系统（Vue Router 4）
+
+共定义23条路由，采用History模式（createWebHistory）：
+
+（1）公开路由（无需登录）
+    /                 → 首页（HomeView）
+    /login            → 登录（LoginView）
+    /register         → 注册（RegisterView）
+    /forum            → 论坛列表（ForumView）
+    /post/:id         → 帖子详情（PostDetailView）
+    /profile/:id?     → 个人主页（ProfileView，id可选）
+    /spots            → 钓点推荐（SpotMapView）
+    /wiki             → 百科列表（WikiView）
+    /wiki/:id         → 百科详情（WikiDetailView）
+    /weather          → 天气查询（WeatherView）
+
+（2）需要登录的路由（meta.auth = true）
+    /post/create      → 发帖（CreatePostView）
+    /post/edit/:id    → 编辑帖子（EditPostView）
+    /messages         → 私信（MessageView）
+    /notifications    → 通知（NotificationView）
+
+（3）管理员路由（meta.admin = true）
+    /admin            → 管理仪表盘（DashboardView）
+    /admin/users      → 用户管理（UserManageView）
+    /admin/audit      → 内容审核（ContentAuditView）
+    /admin/announcements → 公告管理（AnnouncementView）
+
+路由守卫（beforeEach）实现：
+    - 自动设置页面标题（document.title）
+    - 未登录访问auth路由 → 重定向到/login（携带redirect参数）
+    - 非管理员访问admin路由 → 重定向到首页
+
+注意：/post/create和/post/edit/:id路由必须定义在/post/:id之前，
+否则Vue Router会将"create"匹配为动态:id参数。
+
+4.3 状态管理（Pinia）
+
+用户状态管理（stores/user.js）：
+
+（1）状态数据
+    - token：JWT令牌（从localStorage初始化）
+    - user：用户信息对象（从localStorage初始化）
+
+（2）计算属性
+    - isLoggedIn：是否已登录（!!token.value）
+    - isAdmin：是否管理员（user.role === 'ADMIN'）
+    - userId：当前用户ID（user.id）
+
+（3）核心方法
+    - login(username, password)：调用/api/auth/login，存储token和user到localStorage
+    - register(username, password, email)：调用/api/auth/register
+    - fetchCurrentUser()：调用/api/users/me刷新用户信息
+    - logout()：清除token和user，移除localStorage
+
+4.4 HTTP请求封装（Axios）
+
+request.js配置：
+
+（1）请求拦截器
+    - 自动从localStorage读取token
+    - 在请求头添加 Authorization: Bearer <token>
+
+（2）响应拦截器
+    - 成功响应：直接返回response.data（即Result对象）
+    - 401错误：清除登录状态，提示"登录已过期"，跳转/login
+    - 403错误：提示"没有权限执行此操作"
+    - 其他错误：显示错误消息
+    - 网络错误：提示"网络连接失败"
+
+4.5 UI组件库（Element Plus）
+
+使用的主要Element Plus组件：
+    - ElButton：按钮（主要/文本/图标按钮）
+    - ElInput：输入框（文本/密码/搜索）
+    - ElForm/ElFormItem：表单布局
+    - ElTable/ElTableColumn：数据表格（后台管理）
+    - ElDialog：弹窗对话框（关注列表/私信/编辑）
+    - ElDropdown/ElDropdownMenu：下拉菜单（用户菜单）
+    - ElTag：标签（板块/类型/角色标记）
+    - ElPagination：分页器
+    - ElMessage：消息提示（成功/警告/错误）
+    - ElEmpty：空状态占位
+    - ElCard：卡片容器
+    - ElTabs/ElTabPane：标签页切换（个人中心）
+
+4.6 页面布局设计
+
+（1）全局布局
+    - 全局最大宽度：1440px（main-content类）
+    - 导航栏：sticky定位，z-index:100
+    - 导航栏最大宽度：1440px（与内容区一致）
+
+（2）双栏布局页面
+    - PostDetailView：3fr + 1fr（主内容75% + 侧边栏25%）
+      侧边栏：作者信息、帖子数据统计、热门帖子、快捷链接
+    - WikiDetailView：4fr + 1fr（主内容80% + 侧边栏20%）
+      侧边栏：词条信息、编辑历史、同类词条、百科分类
+    - HomeView：1fr + 300px（动态列表 + 侧边栏）
+      侧边栏：公告、热门帖子
+    - WeatherView：2列网格（天气详情 + 空气质量/钓鱼指数）
+
+（3）网格布局页面
+    - SpotMapView：2列网格（钓点卡片）
+    - ForumView：帖子列表 + 板块/标签筛选
+
+（4）对话布局
+    - MessageView：240px侧边栏（对话列表） + 1fr聊天区域
+
+4.7 内容安全
+
+    - DOMPurify：帖子HTML内容渲染时使用DOMPurify.sanitize()过滤XSS
+    - marked.js：百科词条Markdown内容渲染为HTML展示
+    - 富文本编辑器：Vue Quill编辑器，支持图片上传
+
+============================================================
+五、数据库技术详解
+============================================================
+
+5.1 数据库选型
+
+    - 数据库：PostgreSQL 16
+    - Docker镜像：postgres:16-alpine（轻量级Alpine版本）
+    - 字符编码：UTF-8
+    - 连接方式：JDBC（jdbc:postgresql://localhost:5432/fishing_forum）
+
+5.2 数据表设计（18张表）
+
+（1）核心业务表
+    users           → 用户表（id, username, password, email, avatar, bio, role, deleted）
+    posts           → 帖子表（id, title, content, user_id, section_id, tag_id, post_type, is_top, is_featured, view_count, like_count, comment_count, deleted）
+    comments        → 评论表（id, content, post_id, user_id, parent_id, like_count, deleted）
+    sections        → 板块表（id, name, description, icon, sort_order, post_count）
+    tags            → 标签表（id, name, section_id, color）
+
+（2）帖子扩展表
+    catch_records   → 渔获日记（post_id, fish_species, weight, length, bait, spot_name, weather, photo_url, fishing_date）
+    gear_reviews    → 装备测评（post_id, brand, model, gear_category, price, rating, pros, cons, photo_url）
+    post_tags       → 帖子标签关联（post_id, tag_id，联合主键）
+
+（3）互动关系表
+    likes           → 点赞（user_id, target_id, target_type，唯一约束）
+    favorites       → 收藏（user_id, post_id，唯一约束）
+    follows         → 关注（follower_id, following_id，唯一约束）
+
+（4）消息通信表
+    messages        → 私信（sender_id, receiver_id, content, is_read）
+    notifications   → 通知（user_id, type, title, content, related_id, is_read）
+
+（5）百科知识表
+    wiki_entries    → 百科词条（title, content, category, user_id, version, view_count, deleted）
+    wiki_histories  → 编辑历史（entry_id, content, user_id, version）
+
+（6）钓点与评价表
+    fishing_spots   → 钓点信息（name, description, latitude, longitude, fish_types, spot_type, rating, review_count, deleted）
+    spot_reviews    → 钓点评价（spot_id, user_id, rating[1-5], content）
+
+（7）运营管理表
+    reports         → 举报（reporter_id, target_id, target_type, reason, status）
+    announcements   → 公告（title, content, is_active）
+
+5.3 主键策略
+
+    - 所有主键使用BIGSERIAL（PostgreSQL自增序列）
+    - MyBatis-Plus配置id-type: auto自动对应
+
+5.4 数据完整性
+
+    - 外键约束：帖子→用户、评论→帖子、收藏→帖子等关键关系设置REFERENCES
+    - 级联删除：评论、帖子标签、钓点评价等使用ON DELETE CASCADE
+    - 唯一约束：用户名唯一、邮箱唯一、点赞/收藏/关注防重复
+    - CHECK约束：评分字段限制在1-5范围内
+
+5.5 逻辑删除
+
+    - users、posts、comments、fishing_spots、wiki_entries表设有deleted字段
+    - deleted=0表示正常，deleted=1表示已删除
+    - MyBatis-Plus全局配置logic-delete自动过滤已删除记录
+
+5.6 索引优化
+
+共创建15个索引：
+    - 帖子索引：section_id, user_id, created_at DESC, post_type, tag_id, view_count DESC
+    - 评论索引：post_id, user_id
+    - 消息索引：receiver_id + is_read（复合索引）
+    - 通知索引：user_id + is_read（复合索引）
+    - 关注索引：follower_id, following_id
+    - 钓点索引：latitude + longitude（空间索引）
+    - 扩展表索引：catch_records.post_id, gear_reviews.post_id
+
+============================================================
+六、容器化部署详解
+============================================================
+
+6.1 Docker Compose编排
+
+三个服务容器：
+
+（1）db — PostgreSQL 16 数据库
+    - 镜像：postgres:16-alpine
+    - 端口映射：5432:5432
+    - 数据持久化：Docker Named Volume（pgdata）
+    - 初始化脚本：
+      · 01-schema.sql（建表脚本，从backend/resources挂载）
+      · 02-data.sql（初始化数据，从docker-init-data.sql挂载）
+    - 健康检查：pg_isready命令，5秒间隔，10次重试
+
+（2）backend — Spring Boot 后端
+    - 构建：./backend/Dockerfile（多阶段构建）
+    - 构建阶段1（Maven构建）：maven:3.9-eclipse-temurin-17 → mvn package -DskipTests
+    - 构建阶段2（运行）：eclipse-temurin:17-jre-alpine → java -jar app.jar
+    - 端口映射：8080:8080
+    - 环境变量覆盖：数据源URL指向db容器（jdbc:postgresql://db:5432/fishing_forum）
+    - 文件挂载：./backend/uploads:/app/uploads（上传文件持久化）
+    - 依赖：db容器健康后才启动
+
+（3）frontend — Vue.js + Nginx 前端
+    - 构建：./frontend/Dockerfile（多阶段构建）
+    - 构建阶段1（Node构建）：node:20-alpine → npm install + npm run build
+    - 构建阶段2（Nginx服务）：nginx:alpine → 将dist目录复制到Nginx HTML目录
+    - 端口映射：3000:80
+    - 依赖：backend容器启动后才启动
+
+6.2 Nginx反向代理配置
+
+nginx.conf核心规则：
+
+（1）前端SPA路由
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    → 所有非文件请求返回index.html，由Vue Router处理前端路由
+
+（2）后端API代理
+    location /api/ {
+        proxy_pass http://backend:8080/api/;
+        proxy_set_header Authorization $http_authorization;  # 转发JWT令牌
+        proxy_pass_header Authorization;
+        proxy_buffering off;
+        proxy_read_timeout 60s;
+        client_max_body_size 20M;  # 文件上传限制
+    }
+    → /api/开头的请求转发到backend容器的8080端口
+
+（3）WebSocket代理
+    location /ws/ {
+        proxy_pass http://backend:8080/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    → WebSocket升级协议转发
+
+============================================================
+七、核心业务流程详解
+============================================================
+
+7.1 用户注册登录流程
+
+    注册流程：
+    前端 → POST /api/auth/register {username, password, email}
+    后端 → 检查用户名唯一性 → BCrypt加密密码 → 插入users表 → 返回成功
+
+    登录流程：
+    前端 → POST /api/auth/login {username, password}
+    后端 → 查询用户 → BCrypt验证密码 → JwtUtil生成令牌（含userId/username/role）
+    后端 → 返回 {token: "eyJ...", user: {id, username, role, avatar, ...}}
+    前端 → Pinia存储token和user → localStorage持久化 → 跳转首页
+
+    后续请求：
+    前端 → Axios拦截器自动添加 Authorization: Bearer <token>
+    后端 → JwtAuthFilter验证令牌 → 设置SecurityContext → 处理业务
+
+7.2 发帖流程
+
+    前端 → 填写标题、内容（富文本）、选择板块、标签、帖子类型
+    如果是CATCH类型 → 额外填写鱼种、重量、饵料、钓点、天气、日期
+    如果是REVIEW类型 → 额外填写品牌、型号、分类、价格、评分、优缺点
+    前端 → POST /api/posts {title, content, sectionId, tagId, postType, catchRecord?, gearReview?}
+    后端 → PostService.createPost：
+        1) 插入posts表
+        2) 如果CATCH类型，插入catch_records表
+        3) 如果REVIEW类型，插入gear_reviews表
+        4) 更新section的post_count
+    后端 → 返回 {code:200, message:"发帖成功", data:{post}}
+
+7.3 互动流程（点赞/收藏/关注）
+
+    点赞toggle：
+    前端 → POST /api/likes {targetId, targetType:"POST"/"COMMENT"}
+    后端 → 查询likes表是否已存在记录
+        有 → 删除记录（取消点赞），帖子like_count - 1
+        无 → 插入记录（点赞），帖子like_count + 1
+
+    收藏toggle：
+    前端 → POST /api/favorites {postId}
+    后端 → 查询favorites表是否已存在记录
+        有 → 删除记录（取消收藏）
+        无 → 插入记录（收藏）
+
+    关注toggle：
+    前端 → POST /api/follows/{followingId}
+    后端 → 查询follows表是否已存在记录
+        有 → 删除记录（取消关注），更新双方follower/following计数
+        无 → 插入记录（关注），更新双方follower/following计数，发送通知
+
+7.4 私信流程
+
+    发送消息：
+    前端 → POST /api/messages {receiverId, content}
+    后端 → 插入messages表 → 返回成功
+
+    获取对话列表：
+    前端 → GET /api/messages
+    后端 → 查询当前用户作为sender或receiver的所有消息 → 按对方用户ID分组 → 取每组最新消息 → 返回对话列表
+
+    获取对话详情：
+    前端 → GET /api/messages/{otherUserId}?page=1&size=50
+    后端 → 查询双方之间的消息记录（分页） → 标记对方发送的未读消息为已读 → 返回消息列表
+
+============================================================
+八、RESTful API接口清单
+============================================================
+
+8.1 认证接口（/api/auth）
+    POST /api/auth/register       → 用户注册
+    POST /api/auth/login          → 用户登录
+
+8.2 用户接口（/api/users）
+    GET  /api/users/me            → 获取当前用户信息
+    PUT  /api/users/me            → 更新个人资料
+    PUT  /api/users/me/password   → 修改密码
+    POST /api/users/me/avatar     → 上传头像
+    GET  /api/users/{id}/profile  → 获取用户公开资料
+    GET  /api/users/{id}/posts    → 获取用户帖子列表
+    GET  /api/users/{id}/followers   → 获取粉丝列表
+    GET  /api/users/{id}/followings  → 获取关注列表
+
+8.3 帖子接口（/api/posts）
+    GET  /api/posts               → 帖子列表（分页/筛选）
+    GET  /api/posts/{id}          → 帖子详情（含渔获/测评扩展数据）
+    GET  /api/posts/hot           → 热门帖子
+    POST /api/posts               → 发布帖子
+    PUT  /api/posts/{id}          → 编辑帖子
+    DELETE /api/posts/{id}        → 删除帖子
+
+8.4 互动接口
+    GET  /api/comments/{postId}   → 获取帖子评论
+    POST /api/comments            → 发表评论
+    DELETE /api/comments/{id}     → 删除评论
+    POST /api/likes               → 点赞/取消点赞
+    POST /api/favorites           → 收藏/取消收藏
+    GET  /api/favorites           → 获取我的收藏
+    POST /api/reports             → 举报
+
+8.5 社交接口
+    POST /api/follows/{id}        → 关注/取消关注
+    GET  /api/follows/check/{id}  → 检查是否已关注
+    POST /api/messages            → 发送私信
+    GET  /api/messages            → 获取对话列表
+    GET  /api/messages/{userId}   → 获取对话详情
+
+8.6 通知接口
+    GET  /api/notifications       → 获取通知列表
+    GET  /api/notifications/unread-count → 未读数
+    PUT  /api/notifications/{id}/read   → 标记已读
+    PUT  /api/notifications/read-all    → 全部已读
+
+8.7 内容接口
+    GET  /api/sections            → 获取板块列表
+    GET  /api/tags                → 获取标签列表
+    GET  /api/spots               → 获取钓点列表
+    POST /api/spots               → 添加钓点
+    POST /api/spots/{id}/reviews  → 钓点评价
+    GET  /api/wiki                → 百科词条列表
+    GET  /api/wiki/{id}           → 百科词条详情
+    POST /api/wiki                → 创建词条
+    PUT  /api/wiki/{id}           → 编辑词条
+    GET  /api/weather             → 天气查询
+    GET  /api/announcements       → 公告列表
+
+8.8 管理接口（/api/admin，需ADMIN角色）
+    GET  /api/admin/users         → 用户列表
+    PUT  /api/admin/users/{id}/toggle-status → 封禁/解封
+    GET  /api/admin/reports       → 举报列表
+    PUT  /api/admin/reports/{id}  → 处理举报
+    GET  /api/admin/statistics    → 数据统计
+    POST /api/admin/announcements → 创建公告
+    DELETE /api/admin/announcements/{id} → 删除公告
+
+8.9 文件接口
+    POST /api/upload/image        → 上传图片
+    GET  /api/uploads/**          → 访问上传文件
+
+============================================================
+九、开发工具与环境
+============================================================
+
+9.1 开发环境
+    - Java版本：JDK 17
+    - Node.js版本：Node 20
+    - 包管理：Maven 3.9（后端）、npm（前端）
+    - 操作系统：Windows 11 (WSL2) / Linux
+
+9.2 开发工具
+    - IntelliJ IDEA：        Java后端开发
+    - Visual Studio Code：   Vue.js前端开发
+    - DBeaver：              PostgreSQL数据库管理
+    - Postman：              API接口调试
+    - Docker Desktop：       容器化构建与部署
+    - Git：                  版本控制
+    - GitHub：               代码托管
+
+9.3 构建与运行命令
+
+    开发模式：
+    后端：cd backend && mvn spring-boot:run
+    前端：cd frontend && npm run dev
+
+    生产构建：
+    后端：cd backend && mvn clean package -DskipTests
+    前端：cd frontend && npm run build
+
+    Docker部署（推荐）：
+    docker compose build                    # 构建所有镜像
+    docker compose up -d                    # 启动所有服务
+    docker compose down                     # 停止所有服务
+    docker compose logs -f backend          # 查看后端日志
+
+    访问地址：
+    前端页面：http://localhost:3000
+    后端API：http://localhost:8080
+    数据库：  localhost:5432 (postgres/postgres)
+
+============================================================
+十、系统特色功能总结
+============================================================
+
+1. 三种帖子类型：普通讨论、渔获日记、装备测评，满足不同交流需求
+2. 完整社交体系：关注/粉丝、私信对话、系统通知、点赞收藏
+3. 知识百科系统：Markdown编辑、版本控制、分类浏览、编辑历史
+4. 钓点信息平台：钓点发布、评分评价、分类筛选
+5. 天气查询服务：实时天气、空气质量、钓鱼指数、多日预报
+6. RBAC权限控制：普通用户与管理员角色分离
+7. 后台管理系统：用户管理、内容审核、公告管理、数据统计
+8. XSS安全防护：DOMPurify过滤用户生成的HTML内容
+9. JWT无状态认证：前后端分离架构下的安全认证方案
+10. Docker一键部署：三容器编排，开发与生产环境一致
+
+============================================================

@@ -1,9 +1,14 @@
 package com.fishforum.controller;
 
 import com.fishforum.common.Result;
+import com.fishforum.dto.AdminBanRequest;
+import com.fishforum.dto.AdminMuteRequest;
+import com.fishforum.dto.AdminRoleRequest;
+import com.fishforum.dto.ReportHandleRequest;
 import com.fishforum.entity.Announcement;
 import com.fishforum.service.AdminService;
 import com.fishforum.service.PostService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -37,8 +42,9 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}/role")
-    public Result<?> changeRole(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
-        return adminService.changeUserRole((Long) auth.getPrincipal(), id, body.get("role"));
+    public Result<?> changeRole(@PathVariable Long id, @Valid @RequestBody AdminRoleRequest request,
+            Authentication auth) {
+        return adminService.changeUserRole((Long) auth.getPrincipal(), id, request.getRole());
     }
 
     @DeleteMapping("/users/{id}")
@@ -47,14 +53,15 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}/ban")
-    public Result<?> setUserBanned(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
-        return adminService.setUserBanned((Long) auth.getPrincipal(), id, Boolean.TRUE.equals(body.get("banned")));
+    public Result<?> setUserBanned(@PathVariable Long id, @Valid @RequestBody AdminBanRequest request,
+            Authentication auth) {
+        return adminService.setUserBanned((Long) auth.getPrincipal(), id, request.getBanned());
     }
 
     @PutMapping("/users/{id}/mute")
-    public Result<?> setUserMuted(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
-        Integer minutes = body.get("minutes") != null ? Integer.valueOf(body.get("minutes").toString()) : 60;
-        return adminService.setUserMuted((Long) auth.getPrincipal(), id, Boolean.TRUE.equals(body.get("muted")), minutes);
+    public Result<?> setUserMuted(@PathVariable Long id, @Valid @RequestBody AdminMuteRequest request,
+            Authentication auth) {
+        return adminService.setUserMuted((Long) auth.getPrincipal(), id, request.getMuted(), request.getMinutes());
     }
 
     // ========== 内容审核 ==========
@@ -67,8 +74,9 @@ public class AdminController {
     }
 
     @PutMapping("/reports/{id}")
-    public Result<?> handleReport(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
-        return adminService.handleReport((Long) auth.getPrincipal(), id, body.get("action"), body.get("reviewNote"));
+    public Result<?> handleReport(@PathVariable Long id, @Valid @RequestBody ReportHandleRequest request,
+            Authentication auth) {
+        return adminService.handleReport((Long) auth.getPrincipal(), id, request.getAction(), request.getReviewNote());
     }
 
     @GetMapping("/logs")

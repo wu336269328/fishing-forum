@@ -1,6 +1,8 @@
 package com.fishforum.config;
 
 import com.fishforum.common.JwtUtil;
+import com.fishforum.entity.User;
+import com.fishforum.mapper.UserMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -113,25 +115,27 @@ public class SecurityConfig {
     public static class JwtAuthFilter extends OncePerRequestFilter {
 
         private final JwtUtil jwtUtil;
+        private final UserMapper userMapper;
 
         @Override
         protected void doFilterInternal(HttpServletRequest request,
                 HttpServletResponse response,
                 FilterChain filterChain) throws ServletException, IOException {
-            // 从Authorization请求头提取令牌
             String authHeader = request.getHeader("Authorization");
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
                 if (jwtUtil.validateToken(token)) {
-                    // 令牌有效，设置认证信息到Security上下文
                     Long userId = jwtUtil.getUserId(token);
-                    String username = jwtUtil.getUsername(token);
-                    String role = jwtUtil.getRole(token);
-
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userId, null,
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    User user = userMapper.selectById(userId);
+                    if (user != null && !Boolean.TRUE.equals(user.getIsBanned()) && user.getRole() != null) {
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                userId,
+                                null,
+                                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    } else {
+                        SecurityContextHolder.clearContext();
+                    }
                 }
             }
             filterChain.doFilter(request, response);

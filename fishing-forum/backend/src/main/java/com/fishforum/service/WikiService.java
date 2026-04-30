@@ -2,6 +2,7 @@ package com.fishforum.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fishforum.common.PageUtils;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
@@ -9,10 +10,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -32,7 +37,7 @@ public class WikiService {
 
     // 获取词条列表（分页）
     public Result<?> listEntries(String category, String keyword, int page, int size) {
-        Page<WikiEntry> pageObj = new Page<>(page, size);
+        Page<WikiEntry> pageObj = PageUtils.pageRequest(page, size);
         LambdaQueryWrapper<WikiEntry> wrapper = new LambdaQueryWrapper<>();
         if (category != null && !category.isEmpty())
             wrapper.eq(WikiEntry::getCategory, category);
@@ -41,10 +46,11 @@ public class WikiService {
         }
         wrapper.orderByDesc(WikiEntry::getUpdatedAt);
         Page<WikiEntry> result = entryMapper.selectPage(pageObj, wrapper);
-        result.getRecords().forEach(this::enrichEntry);
+        List<WikiEntry> records = result.getRecords();
+        fillEntryAuthors(records);
 
         Map<String, Object> data = new HashMap<>();
-        data.put("records", result.getRecords());
+        data.put("records", records);
         data.put("total", result.getTotal());
         return Result.ok(data);
     }
@@ -105,6 +111,14 @@ public class WikiService {
             return Result.error(404, "词条不存在");
         if (!entry.getUserId().equals(userId) && !"ADMIN".equals(role))
             return Result.error(403, "无权删除");
+        List<Long> commentIds = wikiCommentMapper.selectList(new LambdaQueryWrapper<WikiComment>().eq(WikiComment::getEntryId, id))
+                .stream()
+                .map(WikiComment::getId)
+                .toList();
+        for (Long commentId : commentIds) {
+            likeMapper.deleteByTarget("WIKI_COMMENT", commentId);
+            reportMapper.deleteByTarget("WIKI_COMMENT", commentId);
+        }
         wikiCommentMapper.deleteByEntryId(id);
         entryMapper.deleteById(id);
         return Result.ok("删除成功");
@@ -115,7 +129,7 @@ public class WikiService {
                 new LambdaQueryWrapper<WikiComment>()
                         .eq(WikiComment::getEntryId, entryId)
                         .orderByAsc(WikiComment::getCreatedAt));
-        all.forEach(this::enrichComment);
+        fillCommentAuthors(all);
         return Result.ok(buildCommentTree(all));
     }
 
@@ -130,6 +144,12 @@ public class WikiService {
         }
         if (content.length() > 2000) {
             return Result.error(400, "评论内容不能超过2000字");
+        }
+        if (parentId != null) {
+            WikiComment parent = wikiCommentMapper.selectById(parentId);
+            if (parent == null || !entryId.equals(parent.getEntryId())) {
+                return Result.error(400, "父评论不存在或不属于该词条");
+            }
         }
         WikiComment comment = new WikiComment();
         comment.setEntryId(entryId);
@@ -161,9 +181,8 @@ public class WikiService {
         if (!comment.getUserId().equals(userId) && !"ADMIN".equals(role)) {
             return Result.error(403, "无权删除");
         }
-        List<WikiComment> children = wikiCommentMapper.selectList(
-                new LambdaQueryWrapper<WikiComment>().eq(WikiComment::getParentId, id));
-        for (WikiComment child : children) {
+        List<WikiComment> descendants = collectCommentDescendants(id);
+        for (WikiComment child : descendants) {
             likeMapper.deleteByTarget("WIKI_COMMENT", child.getId());
             reportMapper.deleteByTarget("WIKI_COMMENT", child.getId());
             wikiCommentMapper.deleteById(child.getId());
@@ -180,11 +199,7 @@ public class WikiService {
                 new LambdaQueryWrapper<WikiHistory>()
                         .eq(WikiHistory::getEntryId, entryId)
                         .orderByDesc(WikiHistory::getVersion));
-        histories.forEach(h -> {
-            User u = userMapper.selectById(h.getUserId());
-            if (u != null)
-                h.setAuthorName(u.getUsername());
-        });
+        fillHistoryAuthors(histories);
         return Result.ok(histories);
     }
 
@@ -204,18 +219,75 @@ public class WikiService {
         historyMapper.insert(history);
     }
 
+    private void fillEntryAuthors(List<WikiEntry> entries) {
+        Map<Long, User> users = usersById(entries.stream().map(WikiEntry::getUserId).collect(Collectors.toSet()));
+        entries.forEach(entry -> {
+            User user = users.get(entry.getUserId());
+            if (user != null) {
+                entry.setAuthorName(user.getUsername());
+            }
+        });
+    }
+
+    private void fillCommentAuthors(List<WikiComment> comments) {
+        Map<Long, User> users = usersById(comments.stream().map(WikiComment::getUserId).collect(Collectors.toSet()));
+        comments.forEach(comment -> {
+            User user = users.get(comment.getUserId());
+            if (user != null) {
+                comment.setAuthorName(user.getUsername());
+                comment.setAuthorAvatar(user.getAvatar());
+            }
+        });
+    }
+
+    private void fillHistoryAuthors(List<WikiHistory> histories) {
+        Map<Long, User> users = usersById(histories.stream().map(WikiHistory::getUserId).collect(Collectors.toSet()));
+        histories.forEach(history -> {
+            User user = users.get(history.getUserId());
+            if (user != null) {
+                history.setAuthorName(user.getUsername());
+            }
+        });
+    }
+
+    private Map<Long, User> usersById(Set<Long> userIds) {
+        Map<Long, User> users = userIds.isEmpty() ? Map.of()
+                : userMapper.selectBatchIds(userIds).stream().collect(Collectors.toMap(User::getId, Function.identity()));
+        for (Long userId : userIds) {
+            if (!users.containsKey(userId)) {
+                User user = userMapper.selectById(userId);
+                if (user != null) {
+                    users = new java.util.HashMap<>(users);
+                    users.put(userId, user);
+                }
+            }
+        }
+        return users;
+    }
+
+    private List<WikiComment> collectCommentDescendants(Long rootId) {
+        List<WikiComment> descendants = new ArrayList<>();
+        Set<Long> visited = new java.util.HashSet<>();
+        Queue<Long> queue = new ArrayDeque<>();
+        queue.add(rootId);
+        visited.add(rootId);
+        while (!queue.isEmpty()) {
+            Long parentId = queue.poll();
+            List<WikiComment> children = wikiCommentMapper.selectList(
+                    new LambdaQueryWrapper<WikiComment>().eq(WikiComment::getParentId, parentId));
+            for (WikiComment child : children) {
+                if (child.getId() != null && visited.add(child.getId())) {
+                    descendants.add(child);
+                    queue.add(child.getId());
+                }
+            }
+        }
+        return descendants;
+    }
     private void enrichEntry(WikiEntry entry) {
         User u = userMapper.selectById(entry.getUserId());
         if (u != null)
             entry.setAuthorName(u.getUsername());
-    }
-
-    private void enrichComment(WikiComment comment) {
-        User user = userMapper.selectById(comment.getUserId());
-        if (user != null) {
-            comment.setAuthorName(user.getUsername());
-            comment.setAuthorAvatar(user.getAvatar());
-        }
     }
 
     private List<WikiComment> buildCommentTree(List<WikiComment> all) {

@@ -1,6 +1,7 @@
 package com.fishforum.config;
 
 import com.fishforum.common.JwtUtil;
+import com.fishforum.mapper.UserMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -30,6 +31,7 @@ class SecurityConfigTest {
 
     @Autowired MockMvc mockMvc;
     @MockBean JwtUtil jwtUtil;
+    @MockBean UserMapper userMapper;
 
     @Test
     void publicBrowsingGetEndpointsRemainOpen() throws Exception {

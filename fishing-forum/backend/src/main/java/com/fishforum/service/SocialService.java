@@ -2,6 +2,7 @@ package com.fishforum.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fishforum.common.PageUtils;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
@@ -14,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +40,9 @@ public class SocialService {
     public Result<?> toggleFollow(Long followingId, Long followerId) {
         if (followingId.equals(followerId))
             return Result.error("不能关注自己");
+        if (userMapper.selectById(followingId) == null) {
+            return Result.error(404, "用户不存在");
+        }
         LambdaQueryWrapper<Follow> wrapper = new LambdaQueryWrapper<Follow>()
                 .eq(Follow::getFollowerId, followerId).eq(Follow::getFollowingId, followingId);
         Follow existing = followMapper.selectOne(wrapper);
@@ -66,10 +72,8 @@ public class SocialService {
     public Result<?> getFollowings(Long userId) {
         List<Follow> follows = followMapper.selectList(
                 new LambdaQueryWrapper<Follow>().eq(Follow::getFollowerId, userId));
-        List<User> users = follows.stream()
-                .map(f -> userMapper.selectById(f.getFollowingId()))
-                .filter(u -> u != null)
-                .collect(Collectors.toList());
+        List<Long> userIds = follows.stream().map(Follow::getFollowingId).filter(Objects::nonNull).collect(Collectors.toList());
+        List<User> users = userIds.isEmpty() ? List.of() : userMapper.selectBatchIds(userIds);
         return Result.ok(users.stream().map(UserVO::from).collect(Collectors.toList()));
     }
 
@@ -77,10 +81,8 @@ public class SocialService {
     public Result<?> getFollowers(Long userId) {
         List<Follow> follows = followMapper.selectList(
                 new LambdaQueryWrapper<Follow>().eq(Follow::getFollowingId, userId));
-        List<User> users = follows.stream()
-                .map(f -> userMapper.selectById(f.getFollowerId()))
-                .filter(u -> u != null)
-                .collect(Collectors.toList());
+        List<Long> userIds = follows.stream().map(Follow::getFollowerId).filter(Objects::nonNull).collect(Collectors.toList());
+        List<User> users = userIds.isEmpty() ? List.of() : userMapper.selectBatchIds(userIds);
         return Result.ok(users.stream().map(UserVO::from).collect(Collectors.toList()));
     }
 
@@ -94,17 +96,11 @@ public class SocialService {
         if (followingIds.isEmpty()) {
             return Result.ok(Map.of("records", List.of(), "total", 0L, "pages", 0L));
         }
-        Page<Post> pageObj = new Page<>(page, size);
+        Page<Post> pageObj = PageUtils.pageRequest(page, size);
         Page<Post> result = postMapper.selectPage(pageObj, new LambdaQueryWrapper<Post>()
                 .in(Post::getUserId, followingIds)
                 .orderByDesc(Post::getCreatedAt));
-        result.getRecords().forEach(post -> {
-            User author = userMapper.selectById(post.getUserId());
-            if (author != null) {
-                post.setAuthorName(author.getUsername());
-                post.setAuthorAvatar(author.getAvatar());
-            }
-        });
+        fillPostAuthors(result.getRecords());
         Map<String, Object> data = new HashMap<>();
         data.put("records", result.getRecords());
         data.put("total", result.getTotal());
@@ -123,6 +119,12 @@ public class SocialService {
         if (content == null || content.trim().isEmpty()) {
             return Result.error(400, "私信内容不能为空");
         }
+        if (userMapper.selectById(receiverId) == null) {
+            return Result.error(404, "接收者不存在");
+        }
+        if (content.length() > 2000) {
+            return Result.error(400, "私信内容不能超过2000字");
+        }
         Message msg = new Message();
         msg.setSenderId(senderId);
         msg.setReceiverId(receiverId);
@@ -138,7 +140,10 @@ public class SocialService {
 
     // 获取与某用户的对话记录
     public Result<?> getConversation(Long otherUserId, Long currentUserId, int page, int size) {
-        Page<Message> pageObj = new Page<>(page, size);
+        if (userMapper.selectById(otherUserId) == null) {
+            return Result.error(404, "用户不存在");
+        }
+        Page<Message> pageObj = PageUtils.pageRequest(page, size);
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<Message>()
                 .and(w -> w
                         .and(w1 -> w1.eq(Message::getSenderId, currentUserId).eq(Message::getReceiverId, otherUserId))
@@ -194,7 +199,7 @@ public class SocialService {
 
     // 获取用户通知
     public Result<?> getNotifications(Long userId, int page, int size) {
-        Page<Notification> pageObj = new Page<>(page, size);
+        Page<Notification> pageObj = PageUtils.pageRequest(page, size);
         Page<Notification> result = notificationMapper.selectPage(pageObj,
                 new LambdaQueryWrapper<Notification>()
                         .eq(Notification::getUserId, userId)
@@ -241,6 +246,19 @@ public class SocialService {
                     notificationMapper.updateById(n);
                 });
         return Result.ok("全部已读");
+    }
+
+    private void fillPostAuthors(List<Post> posts) {
+        List<Long> userIds = posts.stream().map(Post::getUserId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, User> users = userIds.isEmpty() ? Map.of()
+                : userMapper.selectBatchIds(userIds).stream().collect(Collectors.toMap(User::getId, Function.identity()));
+        posts.forEach(post -> {
+            User author = users.get(post.getUserId());
+            if (author != null) {
+                post.setAuthorName(author.getUsername());
+                post.setAuthorAvatar(author.getAvatar());
+            }
+        });
     }
 
     // 发送通知（内部方法）

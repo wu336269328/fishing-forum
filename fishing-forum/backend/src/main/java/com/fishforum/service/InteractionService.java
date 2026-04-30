@@ -8,10 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,14 +41,7 @@ public class InteractionService {
     public Result<?> getComments(Long postId) {
         List<Comment> all = commentMapper.selectList(
                 new LambdaQueryWrapper<Comment>().eq(Comment::getPostId, postId).orderByAsc(Comment::getCreatedAt));
-        // 填充作者信息
-        all.forEach(c -> {
-            User u = userMapper.selectById(c.getUserId());
-            if (u != null) {
-                c.setAuthorName(u.getUsername());
-                c.setAuthorAvatar(u.getAvatar());
-            }
-        });
+        fillCommentAuthors(all);
         // 构建树形结构
         List<Comment> tree = buildCommentTree(all);
         return Result.ok(tree);
@@ -56,26 +51,35 @@ public class InteractionService {
     @Transactional
     public Result<?> addComment(Long postId, String content, Long parentId, Long userId) {
         User currentUser = userMapper.selectById(userId);
+        if (currentUser != null && Boolean.TRUE.equals(currentUser.getIsBanned())) {
+            return Result.error(403, "账号已被封禁");
+        }
         if (currentUser != null && currentUser.getMutedUntil() != null
                 && currentUser.getMutedUntil().isAfter(java.time.LocalDateTime.now()))
             return Result.error(403, "账号已被禁言，暂不能评论");
+        Post post = postMapper.selectById(postId);
+        if (post == null) {
+            return Result.error(404, "帖子不存在");
+        }
         if (content == null || content.trim().isEmpty())
             return Result.error(400, "评论内容不能为空");
         if (content.length() > 2000)
             return Result.error(400, "评论内容不能超过2000字");
+        if (parentId != null) {
+            Comment parent = commentMapper.selectById(parentId);
+            if (parent == null || !postId.equals(parent.getPostId())) {
+                return Result.error(400, "父评论不存在或不属于该帖子");
+            }
+        }
         Comment comment = new Comment();
         comment.setPostId(postId);
-        comment.setContent(content);
+        comment.setContent(content.trim());
         comment.setParentId(parentId);
         comment.setUserId(userId);
         comment.setLikeCount(0);
         commentMapper.insert(comment);
-        // 更新帖子评论数
-        Post post = postMapper.selectById(postId);
-        if (post != null) {
-            postMapper.incrementCommentCount(postId, 1);
-            notifyCommentParticipants(post, comment, content, userId);
-        }
+        postMapper.incrementCommentCount(postId, 1);
+        notifyCommentParticipants(post, comment, content, userId);
         return Result.ok("评论成功", comment);
     }
 
@@ -88,14 +92,12 @@ public class InteractionService {
         if (!comment.getUserId().equals(userId) && !"ADMIN".equals(role)) {
             return Result.error(403, "无权删除");
         }
-        // 级联删除子评论
-        List<Comment> children = commentMapper.selectList(
-                new LambdaQueryWrapper<Comment>().eq(Comment::getParentId, id));
-        int deletedCount = 1 + children.size();
-        for (Comment child : children) {
-            commentMapper.deleteById(child.getId());
+        List<Comment> descendants = collectDescendants(id);
+        int deletedCount = 1 + descendants.size();
+        for (Comment child : descendants) {
             likeMapper.deleteByTarget("COMMENT", child.getId());
             reportMapper.deleteByTarget("COMMENT", child.getId());
+            commentMapper.deleteById(child.getId());
         }
         likeMapper.deleteByTarget("COMMENT", id);
         reportMapper.deleteByTarget("COMMENT", id);
@@ -107,6 +109,9 @@ public class InteractionService {
     // 点赞/取消点赞
     @Transactional
     public Result<?> toggleLike(Long targetId, String targetType, Long userId) {
+        if (!targetExists(targetType, targetId)) {
+            return Result.error(404, "点赞目标不存在");
+        }
         LambdaQueryWrapper<Like> wrapper = new LambdaQueryWrapper<Like>()
                 .eq(Like::getUserId, userId).eq(Like::getTargetId, targetId).eq(Like::getTargetType, targetType);
         Like existing = likeMapper.selectOne(wrapper);
@@ -186,6 +191,10 @@ public class InteractionService {
     // 收藏/取消收藏
     @Transactional
     public Result<?> toggleFavorite(Long postId, Long userId) {
+        Post post = postMapper.selectById(postId);
+        if (post == null) {
+            return Result.error(404, "帖子不存在");
+        }
         LambdaQueryWrapper<Favorite> wrapper = new LambdaQueryWrapper<Favorite>()
                 .eq(Favorite::getUserId, userId).eq(Favorite::getPostId, postId);
         Favorite existing = favoriteMapper.selectOne(wrapper);
@@ -198,8 +207,7 @@ public class InteractionService {
             fav.setUserId(userId);
             fav.setPostId(postId);
             favoriteMapper.insert(fav);
-            Post post = postMapper.selectById(postId);
-            if (post != null && !post.getUserId().equals(userId)) {
+            if (!post.getUserId().equals(userId)) {
                 socialService.sendNotification(post.getUserId(), "FAVORITE", "帖子被收藏",
                         "你的帖子被用户收藏", postId);
             }
@@ -224,8 +232,14 @@ public class InteractionService {
         if (reason == null || reason.trim().isEmpty()) {
             return Result.error(400, "举报原因不能为空");
         }
+        if (reason.length() > 500) {
+            return Result.error(400, "举报原因不能超过500字");
+        }
         if (!Set.of("POST", "COMMENT", "USER", "WIKI_COMMENT").contains(targetType)) {
             return Result.error(400, "不支持的举报类型");
+        }
+        if (!targetExists(targetType, targetId)) {
+            return Result.error(404, "举报目标不存在");
         }
         Report report = new Report();
         report.setReporterId(userId);
@@ -255,6 +269,62 @@ public class InteractionService {
                 wikiCommentMapper.incrementLikeCount(targetId, delta);
             }
         }
+    }
+
+    private void fillCommentAuthors(List<Comment> comments) {
+        Set<Long> userIds = comments.stream().map(Comment::getUserId).collect(Collectors.toSet());
+        Map<Long, User> users = userIds.isEmpty() ? Map.of()
+                : userMapper.selectBatchIds(userIds).stream().collect(Collectors.toMap(User::getId, user -> user));
+        for (Long userId : userIds) {
+            if (!users.containsKey(userId)) {
+                User user = userMapper.selectById(userId);
+                if (user != null) {
+                    users = new java.util.HashMap<>(users);
+                    users.put(userId, user);
+                }
+            }
+        }
+        Map<Long, User> finalUsers = users;
+        comments.forEach(comment -> {
+            User user = finalUsers.get(comment.getUserId());
+            if (user != null) {
+                comment.setAuthorName(user.getUsername());
+                comment.setAuthorAvatar(user.getAvatar());
+            }
+        });
+    }
+
+    private List<Comment> collectDescendants(Long rootId) {
+        List<Comment> descendants = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        Queue<Long> queue = new ArrayDeque<>();
+        queue.add(rootId);
+        visited.add(rootId);
+        while (!queue.isEmpty()) {
+            Long parentId = queue.poll();
+            List<Comment> children = commentMapper.selectList(
+                    new LambdaQueryWrapper<Comment>().eq(Comment::getParentId, parentId));
+            for (Comment child : children) {
+                if (child.getId() != null && visited.add(child.getId())) {
+                    descendants.add(child);
+                    queue.add(child.getId());
+                }
+            }
+        }
+        return descendants;
+    }
+
+    private boolean targetExists(String targetType, Long targetId) {
+        if (targetId == null || targetType == null) {
+            return false;
+        }
+        return switch (targetType) {
+            case "POST" -> postMapper.selectById(targetId) != null;
+            case "COMMENT" -> commentMapper.selectById(targetId) != null;
+            case "WIKI_COMMENT" -> wikiCommentMapper.selectById(targetId) != null;
+            case "USER" -> userMapper.selectById(targetId) != null;
+            default -> false;
+        };
     }
 
     // 构建评论树

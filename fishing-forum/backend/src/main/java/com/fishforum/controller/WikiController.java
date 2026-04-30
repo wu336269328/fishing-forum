@@ -1,8 +1,11 @@
 package com.fishforum.controller;
 
 import com.fishforum.common.Result;
+import com.fishforum.dto.WikiCommentCreateRequest;
+import com.fishforum.dto.WikiEntryRequest;
 import com.fishforum.entity.WikiEntry;
 import com.fishforum.service.WikiService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -41,14 +44,14 @@ public class WikiController {
 
     // 创建词条
     @PostMapping
-    public Result<?> createEntry(@RequestBody WikiEntry entry, Authentication auth) {
-        return wikiService.createEntry(entry, (Long) auth.getPrincipal());
+    public Result<?> createEntry(@Valid @RequestBody WikiEntryRequest request, Authentication auth) {
+        return wikiService.createEntry(toEntry(request), (Long) auth.getPrincipal());
     }
 
     // 编辑词条
     @PutMapping("/{id}")
-    public Result<?> updateEntry(@PathVariable Long id, @RequestBody WikiEntry entry, Authentication auth) {
-        return wikiService.updateEntry(id, entry, (Long) auth.getPrincipal());
+    public Result<?> updateEntry(@PathVariable Long id, @Valid @RequestBody WikiEntryRequest request, Authentication auth) {
+        return wikiService.updateEntry(id, toEntry(request), (Long) auth.getPrincipal());
     }
 
     // 删除词条
@@ -72,11 +75,9 @@ public class WikiController {
 
     // 发布百科评论
     @PostMapping("/{id}/comments")
-    public Result<?> addComment(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body,
+    public Result<?> addComment(@PathVariable Long id, @Valid @RequestBody WikiCommentCreateRequest request,
             Authentication auth) {
-        String content = (String) body.get("content");
-        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : null;
-        return wikiService.addComment(id, content, parentId, (Long) auth.getPrincipal());
+        return wikiService.addComment(id, request.getContent(), request.getParentId(), (Long) auth.getPrincipal());
     }
 
     // 删除百科评论
@@ -84,5 +85,13 @@ public class WikiController {
     public Result<?> deleteComment(@PathVariable Long commentId, Authentication auth) {
         String role = auth.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
         return wikiService.deleteComment(commentId, (Long) auth.getPrincipal(), role);
+    }
+
+    private WikiEntry toEntry(WikiEntryRequest request) {
+        WikiEntry entry = new WikiEntry();
+        entry.setTitle(request.getTitle());
+        entry.setContent(request.getContent());
+        entry.setCategory(request.getCategory());
+        return entry;
     }
 }

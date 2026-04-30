@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ORIGINS}
+  security:
+    trusted-proxies: ${TRUSTED_PROXIES:}
+
+upload:
+  path: ${UPLOAD_PATH}

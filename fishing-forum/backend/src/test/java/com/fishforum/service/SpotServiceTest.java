@@ -41,7 +41,7 @@ class SpotServiceTest {
         page.setTotal(1);
         when(spotMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(page);
         User user = new User(); user.setId(3L); user.setUsername("creator");
-        when(userMapper.selectById(3L)).thenReturn(user);
+        when(userMapper.selectBatchIds(anyCollection())).thenReturn(List.of(user));
 
         Result<?> result = spotService.listSpots("鲫鱼", "水库", 1, 10);
 
@@ -114,6 +114,7 @@ class SpotServiceTest {
 
     @Test
     void toggleFavoriteCreatesAndRemovesSpotFavorite() {
+        when(spotMapper.selectById(7L)).thenReturn(spot(7L, 3L));
         when(spotFavoriteMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         Result<?> created = spotService.toggleFavorite(7L, 3L);
@@ -139,7 +140,7 @@ class SpotServiceTest {
         when(spotFavoriteMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(favorite));
         when(spotMapper.selectById(7L)).thenReturn(spot);
         User user = new User(); user.setId(3L); user.setUsername("creator");
-        when(userMapper.selectById(3L)).thenReturn(user);
+        when(userMapper.selectBatchIds(anyCollection())).thenReturn(List.of(user));
 
         List<?> favorites = (List<?>) spotService.getUserFavorites(4L).getData();
 

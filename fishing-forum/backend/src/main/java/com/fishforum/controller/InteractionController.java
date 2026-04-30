@@ -1,12 +1,15 @@
 package com.fishforum.controller;
 
 import com.fishforum.common.Result;
+import com.fishforum.dto.CommentCreateRequest;
+import com.fishforum.dto.FavoriteRequest;
+import com.fishforum.dto.LikeRequest;
+import com.fishforum.dto.ReportCreateRequest;
 import com.fishforum.service.InteractionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 /**
  * 评论与互动控制器
@@ -26,11 +29,9 @@ public class InteractionController {
 
     // 发表评论
     @PostMapping("/comments")
-    public Result<?> addComment(@RequestBody Map<String, Object> body, Authentication auth) {
-        Long postId = Long.valueOf(body.get("postId").toString());
-        String content = (String) body.get("content");
-        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : null;
-        return interactionService.addComment(postId, content, parentId, (Long) auth.getPrincipal());
+    public Result<?> addComment(@Valid @RequestBody CommentCreateRequest request, Authentication auth) {
+        return interactionService.addComment(request.getPostId(), request.getContent(), request.getParentId(),
+                (Long) auth.getPrincipal());
     }
 
     // 删除评论
@@ -42,16 +43,14 @@ public class InteractionController {
 
     // 点赞/取消点赞
     @PostMapping("/likes")
-    public Result<?> toggleLike(@RequestBody Map<String, Object> body, Authentication auth) {
-        Long targetId = Long.valueOf(body.get("targetId").toString());
-        String targetType = (String) body.get("targetType");
-        return interactionService.toggleLike(targetId, targetType, (Long) auth.getPrincipal());
+    public Result<?> toggleLike(@Valid @RequestBody LikeRequest request, Authentication auth) {
+        return interactionService.toggleLike(request.getTargetId(), request.getTargetType(), (Long) auth.getPrincipal());
     }
 
     // 收藏/取消收藏
     @PostMapping("/favorites")
-    public Result<?> toggleFavorite(@RequestBody Map<String, Long> body, Authentication auth) {
-        return interactionService.toggleFavorite(body.get("postId"), (Long) auth.getPrincipal());
+    public Result<?> toggleFavorite(@Valid @RequestBody FavoriteRequest request, Authentication auth) {
+        return interactionService.toggleFavorite(request.getPostId(), (Long) auth.getPrincipal());
     }
 
     // 获取用户收藏
@@ -64,10 +63,8 @@ public class InteractionController {
 
     // 举报
     @PostMapping("/reports")
-    public Result<?> report(@RequestBody Map<String, Object> body, Authentication auth) {
-        Long targetId = Long.valueOf(body.get("targetId").toString());
-        String targetType = (String) body.get("targetType");
-        String reason = (String) body.get("reason");
-        return interactionService.report(targetId, targetType, reason, (Long) auth.getPrincipal());
+    public Result<?> report(@Valid @RequestBody ReportCreateRequest request, Authentication auth) {
+        return interactionService.report(request.getTargetId(), request.getTargetType(), request.getReason(),
+                (Long) auth.getPrincipal());
     }
 }

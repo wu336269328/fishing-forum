@@ -2,7 +2,9 @@ package com.fishforum.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fishforum.common.PageUtils;
 import com.fishforum.common.Result;
+import com.fishforum.dto.PostCreateRequest;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
 import com.fishforum.vo.PostVO;
@@ -15,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,10 +39,12 @@ public class PostService {
     private final CatchRecordMapper catchRecordMapper;
     private final GearReviewMapper gearReviewMapper;
 
+    private static final Set<String> POST_TYPES = Set.of("NORMAL", "CATCH", "REVIEW");
+
     // 获取帖子列表（分页，支持类型和标签筛选）
     public Result<?> listPosts(int page, int size, Long sectionId, String keyword, String sort, String postType,
             Long tagId) {
-        Page<Post> pageObj = new Page<>(page, size);
+        Page<Post> pageObj = PageUtils.pageRequest(page, size);
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<>();
 
         // 按板块筛选
@@ -108,16 +113,86 @@ public class PostService {
     // 发帖
     @Transactional
     public Result<?> createPost(Post post, Long userId) {
+        Result<?> validation = validatePost(post, userId, false);
+        if (validation.getCode() != 200) {
+            return validation;
+        }
+        initializePost(post, userId);
+        postMapper.insert(post);
+        sectionMapper.incrementPostCount(post.getSectionId(), 1);
+        return Result.ok("发帖成功", post);
+    }
+
+    @Transactional
+    public Result<?> createPostWithExtensions(PostCreateRequest request, Long userId) {
+        Post post = new Post();
+        post.setTitle(request.getTitle());
+        post.setContent(request.getContent());
+        post.setSectionId(request.getSectionId());
+        post.setTagId(request.getTagId());
+        post.setPostType(request.getPostType() == null || request.getPostType().isBlank() ? "NORMAL" : request.getPostType());
+
+        Result<?> validation = validatePost(post, userId, true);
+        if (validation.getCode() != 200) {
+            return validation;
+        }
+        if ("CATCH".equals(post.getPostType()) && request.getCatchRecord() == null) {
+            return Result.error(400, "渔获记录不能为空");
+        }
+        if ("REVIEW".equals(post.getPostType()) && request.getGearReview() == null) {
+            return Result.error(400, "装备测评不能为空");
+        }
+
+        initializePost(post, userId);
+        postMapper.insert(post);
+        if ("CATCH".equals(post.getPostType())) {
+            catchRecordMapper.insert(toCatchRecord(request.getCatchRecord(), post.getId()));
+        } else if ("REVIEW".equals(post.getPostType())) {
+            gearReviewMapper.insert(toGearReview(request.getGearReview(), post.getId()));
+        }
+        sectionMapper.incrementPostCount(post.getSectionId(), 1);
+        return Result.ok("发帖成功", post);
+    }
+
+    private Result<?> validatePost(Post post, Long userId, boolean requireReferences) {
         User currentUser = userMapper.selectById(userId);
-        if (currentUser != null && currentUser.getMutedUntil() != null
-                && currentUser.getMutedUntil().isAfter(java.time.LocalDateTime.now()))
+        if (currentUser != null && Boolean.TRUE.equals(currentUser.getIsBanned())) {
+            return Result.error(403, "账号已被封禁");
+        }
+        if (currentUser != null && currentUser.getMutedUntil() != null && currentUser.getMutedUntil().isAfter(java.time.LocalDateTime.now())) {
             return Result.error(403, "账号已被禁言，暂不能发帖");
-        if (post.getTitle() == null || post.getTitle().trim().isEmpty())
+        }
+        if (post.getTitle() == null || post.getTitle().trim().isEmpty()) {
             return Result.error(400, "标题不能为空");
-        if (post.getTitle().length() > 100)
+        }
+        if (post.getTitle().length() > 100) {
             return Result.error(400, "标题不能超过100个字符");
-        if (post.getContent() == null || post.getContent().isEmpty())
+        }
+        if (post.getContent() == null || post.getContent().isEmpty()) {
             return Result.error(400, "内容不能为空");
+        }
+        if (post.getPostType() == null || post.getPostType().isBlank()) {
+            post.setPostType("NORMAL");
+        }
+        if (!POST_TYPES.contains(post.getPostType())) {
+            return Result.error(400, "帖子类型不合法");
+        }
+        if (requireReferences) {
+            Section section = post.getSectionId() == null ? null : sectionMapper.selectById(post.getSectionId());
+            if (section == null) {
+                return Result.error(400, "板块不存在");
+            }
+            if (post.getTagId() != null) {
+                Tag tag = tagMapper.selectById(post.getTagId());
+                if (tag == null || !post.getSectionId().equals(tag.getSectionId())) {
+                    return Result.error(400, "标签不存在或不属于该板块");
+                }
+            }
+        }
+        return Result.ok();
+    }
+
+    private void initializePost(Post post, Long userId) {
         post.setTitle(post.getTitle().trim());
         post.setUserId(userId);
         post.setViewCount(0);
@@ -125,11 +200,34 @@ public class PostService {
         post.setCommentCount(0);
         post.setIsTop(false);
         post.setIsFeatured(false);
-        if (post.getPostType() == null)
-            post.setPostType("NORMAL");
-        postMapper.insert(post);
-        sectionMapper.incrementPostCount(post.getSectionId(), 1);
-        return Result.ok("发帖成功", post);
+    }
+
+    private CatchRecord toCatchRecord(PostCreateRequest.CatchRecordRequest request, Long postId) {
+        CatchRecord record = new CatchRecord();
+        record.setPostId(postId);
+        record.setFishSpecies(request.getFishSpecies());
+        record.setWeight(request.getWeight());
+        record.setLength(request.getLength());
+        record.setBait(request.getBait());
+        record.setSpotName(request.getSpotName());
+        record.setWeather(request.getWeather());
+        record.setPhotoUrl(request.getPhotoUrl());
+        record.setFishingDate(request.getFishingDate());
+        return record;
+    }
+
+    private GearReview toGearReview(PostCreateRequest.GearReviewRequest request, Long postId) {
+        GearReview review = new GearReview();
+        review.setPostId(postId);
+        review.setBrand(request.getBrand());
+        review.setModel(request.getModel());
+        review.setGearCategory(request.getGearCategory());
+        review.setPrice(request.getPrice());
+        review.setRating(request.getRating());
+        review.setPros(request.getPros());
+        review.setCons(request.getCons());
+        review.setPhotoUrl(request.getPhotoUrl());
+        return review;
     }
 
     // 更新帖子
@@ -158,6 +256,14 @@ public class PostService {
             return Result.error(403, "无权删除");
         likeMapper.deleteByTarget("POST", id);
         favoriteMapper.deleteByPostId(id);
+        List<Long> commentIds = commentMapper.selectList(new LambdaQueryWrapper<Comment>().eq(Comment::getPostId, id))
+                .stream()
+                .map(Comment::getId)
+                .toList();
+        for (Long commentId : commentIds) {
+            likeMapper.deleteByTarget("COMMENT", commentId);
+            reportMapper.deleteByTarget("COMMENT", commentId);
+        }
         commentMapper.deleteByPostId(id);
         reportMapper.deleteByTarget("POST", id);
         catchRecordMapper.deleteByPostId(id);
@@ -204,7 +310,7 @@ public class PostService {
 
     // 获取用户的帖子
     public Result<?> getUserPosts(Long userId, int page, int size) {
-        Page<Post> pageObj = new Page<>(page, size);
+        Page<Post> pageObj = PageUtils.pageRequest(page, size);
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
                 .eq(Post::getUserId, userId).orderByDesc(Post::getCreatedAt);
         Page<Post> result = postMapper.selectPage(pageObj, wrapper);
@@ -270,13 +376,14 @@ public class PostService {
     public Result<?> getHotPosts(int limit) {
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
                 .orderByDesc(Post::getViewCount)
-                .last("LIMIT " + Math.min(limit, 20));
+                .last("LIMIT " + Math.min(Math.max(limit, 1), 20));
         List<Post> posts = postMapper.selectList(wrapper);
         return Result.ok(enrichPosts(posts));
     }
 
     // 热门标签（按帖子数量统计）
     public Result<?> getHotTags(int limit) {
+        int safeLimit = Math.min(Math.max(limit, 1), 50);
         List<Tag> allTags = tagMapper.selectList(null);
         // 统计每个标签的帖子数
         allTags.forEach(tag -> {
@@ -286,7 +393,7 @@ public class PostService {
         });
         allTags.sort((a, b) -> (b.getPostCount() != null ? b.getPostCount() : 0)
                 - (a.getPostCount() != null ? a.getPostCount() : 0));
-        return Result.ok(allTags.subList(0, Math.min(limit, allTags.size())));
+        return Result.ok(allTags.subList(0, Math.min(safeLimit, allTags.size())));
     }
 
     // 保存渔获记录

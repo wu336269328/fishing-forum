@@ -2,6 +2,7 @@ package com.fishforum.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fishforum.common.PageUtils;
 import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
@@ -60,7 +61,7 @@ public class AdminService {
 
     // ========== 用户管理 ==========
     public Result<?> listUsers(int page, int size, String keyword) {
-        Page<User> pageObj = new Page<>(page, size);
+        Page<User> pageObj = PageUtils.pageRequest(page, size);
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isEmpty()) {
             wrapper.like(User::getUsername, keyword).or().like(User::getEmail, keyword);
@@ -94,6 +95,9 @@ public class AdminService {
     public Result<?> deleteUser(Long adminId, Long userId) {
         if (adminId.equals(userId))
             return Result.error(400, "不能删除当前管理员");
+        User user = userMapper.selectById(userId);
+        if (user == null)
+            return Result.error(404, "用户不存在");
         userMapper.deleteById(userId);
         log(adminId, "DELETE_USER", "USER", userId, "delete user");
         return Result.ok("用户已删除");
@@ -128,7 +132,7 @@ public class AdminService {
 
     // ========== 内容审核 ==========
     public Result<?> listReports(int page, int size, String status) {
-        Page<Report> pageObj = new Page<>(page, size);
+        Page<Report> pageObj = PageUtils.pageRequest(page, size);
         LambdaQueryWrapper<Report> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isEmpty())
             wrapper.eq(Report::getStatus, status);
@@ -173,7 +177,7 @@ public class AdminService {
     }
 
     public Result<?> listAdminLogs(int page, int size) {
-        Page<AdminLog> pageObj = new Page<>(page, size);
+        Page<AdminLog> pageObj = PageUtils.pageRequest(page, size);
         Page<AdminLog> result = adminLogMapper.selectPage(pageObj,
                 new LambdaQueryWrapper<AdminLog>().orderByDesc(AdminLog::getCreatedAt));
         Map<String, Object> data = new HashMap<>();

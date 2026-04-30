@@ -31,8 +31,6 @@ mybatis-plus:
   configuration:
     # 驼峰命名映射
     map-underscore-to-camel-case: true
-    # 日志输出SQL（开发时开启）
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     db-config:
       # 主键自增
@@ -47,6 +45,12 @@ jwt:
   secret: ${JWT_SECRET:FishingForumLocalDevSecretKeyThatShouldBeChangedBeforeProduction2024}
   expiration: ${JWT_EXPIRATION:86400000}  # 24小时（毫秒）
 
+app:
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+  security:
+    trusted-proxies: ${TRUSTED_PROXIES:}
+
 # 文件上传路径
 upload:
-  path: ./uploads/
+  path: ${UPLOAD_PATH:./uploads/}
