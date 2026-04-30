@@ -4,15 +4,15 @@
     <div class="main-col">
       <div class="card">
         <el-button text size="small" @click="$router.push('/wiki')">← 返回百科</el-button>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin:8px 0">
-          <h1 style="font-size:20px">{{ entry.title }}</h1>
-          <el-button v-if="userStore.isLoggedIn" size="small" @click="startEdit">✏️ 编辑词条</el-button>
+        <div class="wiki-detail-head">
+          <h1>{{ entry.title }}</h1>
+          <el-button v-if="userStore.isLoggedIn" size="small" @click="startEdit">编辑词条</el-button>
         </div>
-        <div style="font-size:12px; color:#999; margin-bottom:16px; display:flex; gap:12px">
+        <div class="wiki-detail-meta">
           <span>{{ entry.category }}</span>
           <span>作者: <span class="text-link" @click="$router.push(`/profile/${entry.userId}`)">{{ entry.authorName }}</span></span>
           <span>版本 v{{ entry.version }}</span>
-          <span>👁 {{ entry.viewCount }}</span>
+          <span>浏览 {{ entry.viewCount }}</span>
         </div>
         <div class="wiki-content" v-html="renderedContent"></div>
       </div>
@@ -48,7 +48,7 @@
 
       <div class="card">
         <div class="section-head">
-          <h3>💬 词条讨论</h3>
+          <h3>词条讨论</h3>
           <span class="text-muted">{{ wikiComments.length }} 条讨论</span>
         </div>
         <div v-if="userStore.isLoggedIn" class="comment-editor">
@@ -71,7 +71,7 @@
               </div>
               <p>{{ c.content }}</p>
               <div class="comment-tools">
-                <el-button text size="small" @click="likeWikiComment(c)">👍 {{ c.likeCount || 0 }}</el-button>
+                <el-button text size="small" @click="likeWikiComment(c)">赞 {{ c.likeCount || 0 }}</el-button>
                 <el-button v-if="userStore.isLoggedIn" text size="small" @click="replyTarget = replyTarget?.id === c.id ? null : c">回复</el-button>
                 <el-button v-if="userStore.isLoggedIn" text size="small" @click="reportWikiComment(c)">举报</el-button>
                 <el-button v-if="canDelete(c)" text size="small" type="danger" @click="deleteWikiComment(c)">删除</el-button>
@@ -112,16 +112,16 @@
     <div class="side-col">
       <!-- 词条信息 -->
       <div class="card">
-        <h3 style="font-size:14px; margin-bottom:10px">📋 词条信息</h3>
-        <div class="side-stat"><span>📂 分类</span><b>{{ entry.category }}</b></div>
-        <div class="side-stat"><span>📝 作者</span><b>{{ entry.authorName }}</b></div>
-        <div class="side-stat"><span>📊 版本</span><b>v{{ entry.version }}</b></div>
-        <div class="side-stat"><span>👁 浏览</span><b>{{ entry.viewCount }}</b></div>
+        <h3 style="font-size:14px; margin-bottom:10px">词条信息</h3>
+        <div class="side-stat"><span>分类</span><b>{{ entry.category }}</b></div>
+        <div class="side-stat"><span>作者</span><b>{{ entry.authorName }}</b></div>
+        <div class="side-stat"><span>版本</span><b>v{{ entry.version }}</b></div>
+        <div class="side-stat"><span>浏览</span><b>{{ entry.viewCount }}</b></div>
       </div>
 
       <!-- 编辑历史 -->
       <div class="card">
-        <h3 style="font-size:14px; margin-bottom:10px">📜 编辑历史</h3>
+        <h3 style="font-size:14px; margin-bottom:10px">编辑历史</h3>
         <div v-for="h in histories" :key="h.id" style="display:flex; gap:8px; padding:5px 0; border-bottom:1px solid #f5f5f5; font-size:12px; align-items:center">
           <el-tag size="small" effect="plain">v{{ h.version }}</el-tag>
           <span style="flex:1">{{ h.authorName }}</span>
@@ -132,7 +132,7 @@
 
       <!-- 同类词条 -->
       <div class="card" v-if="relatedEntries.length">
-        <h3 style="font-size:14px; margin-bottom:10px">📖 相关词条</h3>
+        <h3 style="font-size:14px; margin-bottom:10px">相关词条</h3>
         <div v-for="re in relatedEntries" :key="re.id" class="side-item" style="cursor:pointer" @click="$router.push(`/wiki/${re.id}`)">
           <span style="font-size:13px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ re.title }}</span>
           <span class="text-muted">{{ re.category }}</span>
@@ -141,17 +141,24 @@
 
       <!-- 百科分类 -->
       <div class="card">
-        <h3 style="font-size:14px; margin-bottom:10px">🗂️ 百科分类</h3>
-        <router-link v-for="cat in ['鱼种','饵料','装备','技巧','常识','鱼种图鉴']" :key="cat" :to="`/wiki?category=${cat}`" class="quick-link">📁 {{ cat }}</router-link>
+        <h3 style="font-size:14px; margin-bottom:10px">百科分类</h3>
+        <router-link v-for="cat in ['鱼种','饵料','装备','技巧','常识','鱼种图鉴']" :key="cat" :to="`/wiki?category=${cat}`" class="quick-link">{{ cat }}</router-link>
       </div>
 
       <div class="card">
-        <h3 style="font-size:14px; margin-bottom:10px">🔗 快捷入口</h3>
-        <router-link to="/wiki" class="quick-link">📖 百科首页</router-link>
-        <router-link to="/forum" class="quick-link">📋 论坛首页</router-link>
-        <router-link to="/spots" class="quick-link">📍 钓点推荐</router-link>
+        <h3 style="font-size:14px; margin-bottom:10px">快捷入口</h3>
+        <router-link to="/wiki" class="quick-link">百科首页</router-link>
+        <router-link to="/forum" class="quick-link">论坛首页</router-link>
+        <router-link to="/spots" class="quick-link">钓点推荐</router-link>
       </div>
     </div>
+    <el-dialog v-model="reportDialogVisible" title="举报讨论" width="min(92vw, 420px)" class="responsive-dialog">
+      <el-input v-model="reportReason" type="textarea" :rows="3" placeholder="请填写举报原因" />
+      <template #footer>
+        <el-button @click="reportDialogVisible=false">取消</el-button>
+        <el-button type="primary" @click="submitWikiReport">提交</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -168,6 +175,7 @@ const route = useRoute(), userStore = useUserStore()
 const entry = ref(null), histories = ref([]), relatedEntries = ref([]), wikiComments = ref([])
 const editing = ref(false), saving = ref(false), wikiUploading = ref(false), lastImgUrl = ref('')
 const commentContent = ref(''), replyContent = ref(''), replyTarget = ref(null)
+const reportDialogVisible = ref(false), reportTarget = ref(null), reportReason = ref('')
 const editForm = ref({ title: '', category: '', content: '' })
 const renderedContent = computed(() => entry.value?.content ? DOMPurify.sanitize(marked(entry.value.content)) : '')
 
@@ -228,12 +236,22 @@ const likeWikiComment = async (comment) => {
   }
 }
 
-const reportWikiComment = async (comment) => {
+const reportWikiComment = (comment) => {
   if (!userStore.isLoggedIn) return ElMessage.warning('请先登录')
-  const reason = window.prompt('请输入举报原因')
-  if (!reason || !reason.trim()) return
-  const r = await request.post('/api/reports', { targetId: comment.id, targetType: 'WIKI_COMMENT', reason })
-  if (r.code === 200) ElMessage.success('已提交举报')
+  reportTarget.value = comment
+  reportReason.value = ''
+  reportDialogVisible.value = true
+}
+
+const submitWikiReport = async () => {
+  if (!reportReason.value.trim()) return ElMessage.warning('请填写举报原因')
+  const r = await request.post('/api/reports', { targetId: reportTarget.value.id, targetType: 'WIKI_COMMENT', reason: reportReason.value })
+  if (r.code === 200) {
+    ElMessage.success('已提交举报')
+    reportDialogVisible.value = false
+    reportTarget.value = null
+    reportReason.value = ''
+  }
 }
 
 const canDelete = (comment) => userStore.isLoggedIn && (userStore.isAdmin || comment.userId === userStore.userId)
@@ -263,10 +281,13 @@ onMounted(loadEntry)
 
 <style scoped>
 .detail-grid { grid-template-columns: minmax(0, 4fr) 1fr; }
+.wiki-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0; }
+.wiki-detail-head h1 { font-size: 22px; color: var(--ink); line-height: 1.3; }
+.wiki-detail-meta { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-bottom: 16px; color: #8b98a8; font-size: 12px; }
 .wiki-content { line-height: 1.8; font-size: 15px; color: #444; }
 .wiki-content :deep(h1), .wiki-content :deep(h2), .wiki-content :deep(h3) { margin: 16px 0 8px; color: #222; }
 .wiki-content :deep(ul), .wiki-content :deep(ol) { padding-left: 20px; }
-.wiki-content :deep(strong) { color: #1a73e8; }
+.wiki-content :deep(strong) { color: var(--color-primary-dark); }
 .wiki-content :deep(code) { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; font-size: 13px; }
 .wiki-content :deep(pre) { background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }
 .wiki-content :deep(img) { max-width: 100%; border-radius: 6px; margin: 8px 0; }
@@ -290,8 +311,8 @@ onMounted(loadEntry)
 .side-stat:last-child { border-bottom: none; }
 .side-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
 .quick-link { display: block; padding: 5px 0; font-size: 13px; color: #555; }
-.quick-link:hover { color: #1a73e8; }
+.quick-link:hover { color: var(--color-primary-dark); }
 .img-upload-btn { width: 100px; height: 36px; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #999; cursor: pointer; }
-.img-upload-btn:hover { border-color: #1a73e8; color: #1a73e8; }
-@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .side-col { display: none; } }
+.img-upload-btn:hover { border-color: var(--color-primary-dark); color: var(--color-primary-dark); }
+@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .side-col { display: none; } .wiki-detail-head { align-items: flex-start; flex-direction: column; } .comment-actions { flex-wrap: wrap; } }
 </style>

@@ -1,15 +1,28 @@
 <template>
-  <div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
-      <h1 class="page-title" style="margin:0">通知</h1>
+  <div class="page-shell notification-page">
+    <div class="notification-header">
+      <h1 class="page-title notification-title">通知</h1>
       <el-button text size="small" @click="markAllRead" v-if="notifications.length">全部已读</el-button>
     </div>
-    <div v-for="n in notifications" :key="n.id" class="card" :style="{borderLeft: n.isRead?'':'3px solid #1a73e8', cursor:'pointer'}" @click="markRead(n)">
-      <div style="font-size:14px; font-weight:500">{{ n.title }}</div>
-      <div style="font-size:13px; color:#777">{{ n.content }}</div>
-      <div style="font-size:12px; color:#ccc; margin-top:4px">{{ new Date(n.createdAt).toLocaleString('zh-CN') }}</div>
+    <div
+      v-for="n in notifications"
+      :key="n.id"
+      class="card notification-card"
+      :class="{ unread: !n.isRead }"
+      role="button"
+      tabindex="0"
+      @click="markRead(n)"
+      @keydown.enter.space.prevent="markRead(n)"
+    >
+      <div class="notification-card-title">{{ n.title }}</div>
+      <div class="notification-card-content">{{ n.content }}</div>
+      <div class="notification-card-time">{{ new Date(n.createdAt).toLocaleString('zh-CN') }}</div>
     </div>
-    <el-empty v-if="!notifications.length" description="暂无通知" :image-size="40" />
+    <div v-if="!notifications.length" class="card empty-state">
+      <div class="empty-state-icon">🔔</div>
+      <div class="empty-state-title">还没有新通知</div>
+      <div class="empty-state-text">点赞、评论、关注的更新会出现在这里。</div>
+    </div>
     <div class="pagination-wrap" v-if="total>20"><el-pagination background layout="prev,pager,next" :total="total" :page-size="20" v-model:current-page="page" @current-change="load" /></div>
   </div>
 </template>
@@ -31,3 +44,14 @@ const markRead = async (n) => {
 const markAllRead = async () => { await request.put('/api/notifications/read-all'); notifications.value.forEach(n=>n.isRead=true); ElMessage.success('全部已读') }
 onMounted(load)
 </script>
+
+<style scoped>
+.notification-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.notification-title { margin: 0; }
+.notification-card { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.notification-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-hover); }
+.notification-card.unread { border-left: 3px solid var(--color-primary); }
+.notification-card-title { font-size: 14px; font-weight: 700; color: var(--ink); }
+.notification-card-content { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.notification-card-time { font-size: 12px; color: var(--muted-soft); margin-top: 6px; }
+</style>

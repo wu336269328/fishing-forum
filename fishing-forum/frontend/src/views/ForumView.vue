@@ -5,37 +5,53 @@
       <h1 class="hero-title">讨论、渔获、装备测评都在这里。</h1>
       <p class="hero-subtitle">用板块、标签和排序快速找到对你有用的钓鱼经验。</p>
     </section>
-    <!-- 类型筛选 -->
-    <div class="card type-bar">
-      <el-tag v-for="t in postTypes" :key="t.value" :effect="selectedType===t.value?'dark':'plain'" @click="selectedType=t.value" style="cursor:pointer">{{ t.icon }} {{ t.label }}</el-tag>
-    </div>
-    <!-- 板块+标签筛选 -->
-    <div class="card filter-bar">
-      <el-tag v-for="s in [{id:null,name:'全部',icon:''},...sections]" :key="s.id||'all'" :effect="selectedSection===s.id?'dark':'plain'"
-              @click="selectedSection=s.id; selectedTag=null" style="cursor:pointer; margin:2px">{{ s.icon||'📋' }} {{ s.name }}</el-tag>
+    <!-- 筛选 -->
+    <div class="page-toolbar forum-filter-panel">
+      <div class="filter-block">
+        <span class="filter-label">类型</span>
+        <div class="filter-chip-row">
+          <button v-for="t in postTypes" :key="t.value" type="button" class="ui-chip" :class="{ active: selectedType===t.value }" @click="selectedType=t.value">{{ t.label }}</button>
+        </div>
+      </div>
+      <div class="filter-block">
+        <span class="filter-label">板块</span>
+        <div class="filter-chip-row">
+          <button v-for="s in [{id:null,name:'全部'},...sections]" :key="s.id||'all'" type="button" class="ui-chip" :class="{ active: selectedSection===s.id }" @click="selectedSection=s.id; selectedTag=null">{{ s.name }}</button>
+        </div>
+      </div>
       <div class="filter-actions">
-        <el-input v-model="keyword" placeholder="搜索帖子..." clearable size="small" @keyup.enter="loadPosts" />
+        <el-input v-model="keyword" placeholder="搜索帖子" clearable size="small" @keyup.enter="loadPosts" />
         <el-select v-model="sortBy" size="small">
           <el-option label="最新" value="latest" /><el-option label="最热" value="hot" /><el-option label="点赞" value="likes" />
         </el-select>
+        <el-button size="small" type="primary" @click="loadPosts">搜索</el-button>
+        <el-button size="small" @click="clearFilters">清除</el-button>
       </div>
     </div>
     <!-- 标签筛选 -->
-    <div v-if="tags.length" class="card" style="padding:8px 16px; display:flex; flex-wrap:wrap; gap:4px">
-      <span style="font-size:12px; color:#999; margin-right:4px; line-height:24px">标签:</span>
-      <el-tag v-for="tag in [{id:null,name:'全部'},...tags]" :key="tag.id||'all'" size="small"
-              :effect="selectedTag===tag.id?'dark':'plain'" :color="tag.id && selectedTag===tag.id ? tag.color : ''"
-              @click="selectedTag=tag.id" style="cursor:pointer; margin:1px">{{ tag.name }}</el-tag>
+    <div v-if="tags.length" class="page-toolbar tag-filter-panel">
+      <span class="filter-label">标签</span>
+      <div class="filter-chip-row">
+        <button v-for="tag in [{id:null,name:'全部'},...tags]" :key="tag.id||'all'" type="button" class="ui-chip" :class="{ active: selectedTag===tag.id }" @click="selectedTag=tag.id">{{ tag.name }}</button>
+      </div>
     </div>
     <div class="forum-layout">
       <div class="forum-main">
         <!-- 帖子 -->
-        <div v-for="post in posts" :key="post.id" class="card post-item list-card" @click="$router.push(`/post/${post.id}`)">
+        <article
+          v-for="post in posts"
+          :key="post.id"
+          class="card post-item list-card"
+          role="button"
+          tabindex="0"
+          @click="$router.push(`/post/${post.id}`)"
+          @keydown.enter.space.prevent="$router.push(`/post/${post.id}`)"
+        >
           <div class="card-header">
-            <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-sm" />
-            <div>
+            <img :src="post.authorAvatar||'/default-avatar.png'" class="avatar-sm" loading="lazy" />
+            <div class="post-author-line">
               <span class="text-link" @click.stop="$router.push(`/profile/${post.userId}`)">{{ post.authorName }}</span>
-              <span class="text-muted" style="margin-left:6px">{{ formatTime(post.createdAt) }}</span>
+              <span class="text-muted post-date">{{ formatTime(post.createdAt) }}</span>
             </div>
             <div class="post-tags">
               <el-tag v-if="post.postType==='CATCH'" size="small" type="success">渔获</el-tag>
@@ -53,7 +69,7 @@
             <span>评论 {{ post.commentCount }}</span>
             <span>点赞 {{ post.likeCount }}</span>
           </div>
-        </div>
+        </article>
         <div v-if="loadError" class="card desktop-error-card">
           <div>
             <b>帖子加载失败</b>
@@ -61,8 +77,11 @@
           </div>
           <el-button size="small" type="primary" @click="loadPosts">重新加载</el-button>
         </div>
-        <div v-else-if="!posts.length" class="card desktop-empty-card">
-          <el-empty description="暂无帖子" />
+        <div v-else-if="!posts.length" class="card empty-state">
+          <div class="empty-state-icon">🎣</div>
+          <div class="empty-state-title">这里还没有帖子</div>
+          <div class="empty-state-text">{{ emptyHint }}</div>
+          <el-button type="primary" size="small" round @click="$router.push('/post/create')">发表第一帖</el-button>
         </div>
         <div class="pagination-wrap" v-if="total>10">
           <el-pagination background layout="prev,pager,next" :total="total" :page-size="10" v-model:current-page="currentPage" @current-change="loadPosts" />
@@ -80,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import request from '../api/request'
@@ -93,12 +112,21 @@ const keyword = ref(''), sortBy = ref('latest'), currentPage = ref(1), total = r
 const loadError = ref(false)
 
 const postTypes = [
-  { value: '', label: '全部', icon: '📋' },
-  { value: 'FOLLOWING', label: '关注动态', icon: '👀' },
-  { value: 'NORMAL', label: '讨论', icon: '💬' },
-  { value: 'CATCH', label: '渔获日记', icon: '🐟' },
-  { value: 'REVIEW', label: '装备测评', icon: '⭐' }
+  { value: '', label: '全部' },
+  { value: 'FOLLOWING', label: '关注动态' },
+  { value: 'NORMAL', label: '讨论' },
+  { value: 'CATCH', label: '渔获日记' },
+  { value: 'REVIEW', label: '装备测评' }
 ]
+
+const emptyHint = computed(() => {
+  if (selectedType.value === 'FOLLOWING') return '还没有关注的钓友发新内容，先去发现页认识更多钓友吧。'
+  if (selectedType.value === 'CATCH') return '还没人分享渔获，记录你的下一次出钓让大家看看。'
+  if (selectedType.value === 'REVIEW') return '还没有装备测评，分享一下你正在用的鱼竿、饵料感受。'
+  if (keyword.value) return `没有搜索到「${keyword.value}」相关帖子，换个关键词试试。`
+  if (selectedTag.value || selectedSection.value) return '当前条件下没有帖子，清除筛选看看更多内容。'
+  return '成为第一位发帖人，分享你的钓鱼故事。'
+})
 
 const formatTime = (t) => { if (!t) return ''; const d=new Date(t),now=new Date(),diff=(now-d)/1000; if(diff<60) return '刚刚'; if(diff<3600) return Math.floor(diff/60)+'分钟前'; if(diff<86400) return Math.floor(diff/3600)+'小时前'; return d.toLocaleDateString('zh-CN') }
 const stripHtml = (h) => h ? h.replace(/<[^>]+>/g,'').substring(0,120) : ''
@@ -131,6 +159,16 @@ const loadTags = async () => {
     loadError.value = true
   }
 }
+const clearFilters = () => {
+  selectedSection.value = null
+  selectedTag.value = null
+  selectedType.value = ''
+  keyword.value = ''
+  sortBy.value = 'latest'
+  currentPage.value = 1
+  loadTags()
+  loadPosts()
+}
 
 watch([selectedSection, sortBy, selectedType], () => { currentPage.value = 1; loadPosts() })
 watch(selectedSection, loadTags)
@@ -152,27 +190,36 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.eyebrow { position: relative; z-index: 1; font-size: 12px; color: rgba(255,255,255,.68); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 8px; }
-.type-bar { display: flex; gap: 8px; margin-bottom: 0; padding: 10px 16px; overflow-x: auto; }
-.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
-.filter-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
-.filter-actions .el-input { width: 180px; }
-.filter-actions .el-select { width: 110px; }
+.forum-filter-panel { align-items: stretch; }
+.filter-block { display: grid; gap: 6px; min-width: 0; flex: 1 1 240px; }
+.filter-label { color: var(--muted); font-size: 12px; font-weight: 800; }
+.filter-actions { margin-left: auto; display: flex; align-items: end; gap: 8px; flex: 0 0 auto; }
+.filter-actions .el-input { width: 200px; }
+.filter-actions .el-select { width: 112px; }
+.tag-filter-panel { align-items: center; }
 .forum-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
-.forum-aside { position: sticky; top: 82px; }
-.forum-aside h3 { font-size: 15px; margin-bottom: 8px; }
-.forum-aside .quick-link { display: block; padding: 7px 0; color: #4b5563; font-size: 13px; }
-.post-item { cursor: pointer; transition: box-shadow 0.15s; }
-.post-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.post-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; color: var(--ink); }
-.post-excerpt { font-size: 13px; color: #777; margin-bottom: 8px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.post-meta { font-size: 12px; color: #999; display: flex; gap: 12px; }
+.forum-main { min-width: 0; }
+.forum-aside { position: sticky; top: 82px; border-color: var(--border-subtle); }
+.forum-aside h3 { font-size: 15px; font-weight: 800; margin-bottom: 8px; color: var(--ink); }
+.forum-aside .quick-link { display: block; padding: 8px 0; color: var(--ink); font-size: 13px; border-radius: 6px; }
+.forum-aside .quick-link:hover { color: var(--color-primary); padding-left: 4px; }
+.post-item { cursor: pointer; transition: box-shadow 0.15s; border-color: var(--border-subtle); box-shadow: var(--shadow-card); }
+.post-item:hover { box-shadow: var(--shadow-hover); }
+.card-header { align-items: center; }
+.post-author-line { display: flex; flex-direction: column; min-width: 0; }
+.post-date { color: var(--muted-soft); line-height: 1.2; }
+.post-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; color: var(--ink); line-height: 1.35; letter-spacing: -0.01em; }
+.post-excerpt { font-size: 13px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.post-meta { padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--muted-soft); display: flex; gap: 12px; }
 .post-tags { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 768px) {
-  .filter-actions { width: 100%; margin-left: 0; }
+  .forum-filter-panel { display: grid; gap: 10px; }
+  .filter-block { width: 100%; }
+  .filter-actions { width: 100%; margin-left: 0; display: grid; grid-template-columns: 1fr 112px; }
   .filter-actions .el-input, .filter-actions .el-select { width: 100%; }
+  .filter-actions .el-button { width: 100%; }
   .post-tags { width: 100%; margin-left: 42px; justify-content: flex-start; }
-  .post-meta { flex-wrap: wrap; }
+  .post-meta { flex-wrap: wrap; gap: 8px; }
   .forum-layout { grid-template-columns: 1fr; }
   .forum-aside { display: none; }
 }
