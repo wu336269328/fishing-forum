@@ -1,11 +1,20 @@
 services:
-  # PostgreSQL 数据库
+  # PostgreSQL 数据库 - 调瘦内存占用
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: fishing_forum
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=192MB
+      -c work_mem=2MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=20
+      -c wal_buffers=4MB
+      -c random_page_cost=1.1
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -17,15 +26,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
-  # Spring Boot 后端
+  # Spring Boot 后端 - 容器层限内存，由 JVM 自动按比例算堆
   backend:
     build: ./backend
     environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fishing_forum
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:-FishingForumLocalDevSecretKeyThatShouldBeChangedBeforeProduction2024}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       SPRING_SQL_INIT_MODE: never
     volumes:
       - ./backend/uploads:/app/uploads
@@ -39,15 +54,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    deploy:
+      resources:
+        limits:
+          memory: 384M
 
-  # Vue.js 前端 + Nginx
+  # Vue.js 前端 + Nginx（直出静态资源与 uploads，给后端减压）
   frontend:
     build: ./frontend
     ports:
       - "3000:80"
+    volumes:
+      - ./backend/uploads:/usr/share/nginx/uploads:ro
     depends_on:
       backend:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 volumes:
   pgdata:

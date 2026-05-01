@@ -8,6 +8,7 @@ import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
 import com.fishforum.vo.UserVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,7 @@ public class AdminService {
     private final SensitiveWordMapper sensitiveWordMapper;
 
     // ========== 数据统计 ==========
+    @Cacheable(cacheNames = "statistics", key = "'global'")
     public Result<?> getStatistics() {
         Map<String, Object> stats = new HashMap<>();
         stats.put("userCount", userMapper.selectCount(null));

@@ -1,6 +1,7 @@
 package com.fishforum.service;
 
 import com.fishforum.common.Result;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -16,7 +17,9 @@ public class WeatherService {
     private final RestTemplate restTemplate = new RestTemplate();
     private static final String API_BASE = "https://uapis.cn/api/v1/misc/weather";
 
-    // 查询真实天气
+    // 查询真实天气（按城市缓存 15 分钟，减少外部 API 调用）
+    @Cacheable(cacheNames = "weather", key = "#city == null || #city.isEmpty() ? '北京' : #city",
+               unless = "#result == null || #result.code != 200")
     public Result<?> getWeather(String city) {
         if (city == null || city.isEmpty())
             city = "北京";

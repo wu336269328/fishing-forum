@@ -1,8 +1,36 @@
+# 生产环境配置 - 在 application.yml 基础上调瘦内存与提速
+server:
+  tomcat:
+    threads:
+      max: 20            # 默认 200，钓友圈并发用不到
+      min-spare: 2
+    accept-count: 50
+    max-connections: 200
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/css,text/javascript,application/javascript
+    min-response-size: 1024
+
 spring:
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5      # 单核小机默认 10 太多
+      minimum-idle: 2
+      idle-timeout: 60000
+      max-lifetime: 1800000
+      connection-timeout: 10000
+  jmx:
+    enabled: false              # 关 JMX 注册，省内存与启动时间
+  main:
+    lazy-initialization: true   # Bean 懒加载
+  cache:
+    type: caffeine
+    cache-names: sections,hotTags,hotPosts,statistics,weather,wikiCategories
+    caffeine:
+      spec: maximumSize=200,expireAfterWrite=5m
 
 jwt:
   secret: ${JWT_SECRET}
@@ -15,4 +43,13 @@ app:
     trusted-proxies: ${TRUSTED_PROXIES:}
 
 upload:
-  path: ${UPLOAD_PATH}
+  path: ${UPLOAD_PATH:/app/uploads/}
+
+logging:
+  level:
+    root: WARN                  # 生产关闭 INFO 噪声
+    com.fishforum: INFO
+    org.springframework.web: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"

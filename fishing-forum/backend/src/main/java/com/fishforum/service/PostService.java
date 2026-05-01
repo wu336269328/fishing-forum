@@ -9,6 +9,9 @@ import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
 import com.fishforum.vo.PostVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -112,6 +115,11 @@ public class PostService {
 
     // 发帖
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "sections", allEntries = true),
+        @CacheEvict(cacheNames = "hotPosts", allEntries = true),
+        @CacheEvict(cacheNames = "hotTags",  allEntries = true)
+    })
     public Result<?> createPost(Post post, Long userId) {
         Result<?> validation = validatePost(post, userId, false);
         if (validation.getCode() != 200) {
@@ -124,6 +132,11 @@ public class PostService {
     }
 
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "sections", allEntries = true),
+        @CacheEvict(cacheNames = "hotPosts", allEntries = true),
+        @CacheEvict(cacheNames = "hotTags",  allEntries = true)
+    })
     public Result<?> createPostWithExtensions(PostCreateRequest request, Long userId) {
         Post post = new Post();
         post.setTitle(request.getTitle());
@@ -248,6 +261,11 @@ public class PostService {
 
     // 删除帖子
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = "sections", allEntries = true),
+        @CacheEvict(cacheNames = "hotPosts", allEntries = true),
+        @CacheEvict(cacheNames = "hotTags",  allEntries = true)
+    })
     public Result<?> deletePost(Long id, Long userId, String role) {
         Post post = postMapper.selectById(id);
         if (post == null)
@@ -273,7 +291,8 @@ public class PostService {
         return Result.ok("删除成功");
     }
 
-    // 获取所有板块
+    // 获取所有板块（板块基本不变，长期缓存）
+    @Cacheable(cacheNames = "sections", key = "'all'")
     public Result<?> listSections() {
         List<Section> sections = sectionMapper.selectList(
                 new LambdaQueryWrapper<Section>().orderByAsc(Section::getSortOrder));
@@ -372,7 +391,8 @@ public class PostService {
         return ids.isEmpty() ? List.of() : tagMapper.selectBatchIds(ids);
     }
 
-    // 热门帖子 Top N
+    // 热门帖子 Top N（5 分钟缓存）
+    @Cacheable(cacheNames = "hotPosts", key = "#limit")
     public Result<?> getHotPosts(int limit) {
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
                 .orderByDesc(Post::getViewCount)
@@ -381,7 +401,8 @@ public class PostService {
         return Result.ok(enrichPosts(posts));
     }
 
-    // 热门标签（按帖子数量统计）
+    // 热门标签（按帖子数量统计，5 分钟缓存）
+    @Cacheable(cacheNames = "hotTags", key = "#limit")
     public Result<?> getHotTags(int limit) {
         int safeLimit = Math.min(Math.max(limit, 1), 50);
         List<Tag> allTags = tagMapper.selectList(null);

@@ -7,6 +7,7 @@ import com.fishforum.common.Result;
 import com.fishforum.entity.*;
 import com.fishforum.mapper.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -203,7 +204,8 @@ public class WikiService {
         return Result.ok(histories);
     }
 
-    // 获取分类列表
+    // 获取分类列表（写死常量，永久缓存即可）
+    @Cacheable(cacheNames = "wikiCategories", key = "'all'")
     public Result<?> getCategories() {
         List<String> categories = List.of("鱼种", "饵料", "装备", "技巧", "常识", "鱼种图鉴");
         return Result.ok(categories);
